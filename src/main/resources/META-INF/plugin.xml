@@ -1,0 +1,60 @@
+<!-- Plugin Configuration File. Read more: https://plugins.jetbrains.com/docs/intellij/plugin-configuration-file.html -->
+<idea-plugin>
+    <!-- Unique identifier of the plugin. It should be FQN. It cannot be changed between the plugin versions. -->
+    <id>visualboost.plugin</id>
+
+    <!-- Public plugin name should be written in Title Case.
+         Guidelines: https://plugins.jetbrains.com/docs/marketplace/plugin-overview-page.html#plugin-name -->
+    <name>VisualBoost</name>
+
+    <!-- A displayed Vendor name or Organization ID displayed on the Plugins Page. -->
+    <vendor email="contact@walt-it.de" url="https://visualboost.de">WALT-IT</vendor>
+
+    <!-- Description of the plugin displayed on the Plugin Page and IDE Plugin Manager.
+         Simple HTML elements (text formatting, paragraphs, and lists) can be added inside of <![CDATA[ ]]> tag.
+         Guidelines: https://plugins.jetbrains.com/docs/marketplace/plugin-overview-page.html#plugin-description -->
+    <description>Unlock your software development potential effortlessly with VisualBoost! Our web-based application assists developers in implementing both backend and frontend applications, freeing them to focus on business logic while automating redundant tasks. VisualBoost empowers you to design comprehensive software architectures and seamlessly transform them into fully functional backend applications with corresponding client code. The resulting product is entirely yours to own. Furthermore, VisualBoost allows customization of the generated code, with any adjustments seamlessly integrated back into the overarching concept. Accelerate your development process and amplify productivity with VisualBoost!</description>
+
+    <!-- Product and plugin compatibility requirements.
+         Read more: https://plugins.jetbrains.com/docs/intellij/plugin-compatibility.html -->
+    <depends>com.intellij.modules.platform</depends>
+    <depends>org.jetbrains.android</depends>
+
+    <!-- Extension points defined by the plugin.
+         Read more: https://plugins.jetbrains.com/docs/intellij/plugin-extension-points.html -->
+    <extensions defaultExtensionNs="com.intellij">
+        <toolWindow id="VisualBoost" anchor="right" factoryClass="visualboost.plugin.VbWindowFactory"
+                    icon="/icons/logo_13x13.png"/>
+        <projectService id="VbWindowService" serviceImplementation="visualboost.plugin.VbWindowService"/>
+
+        <notificationGroup id="visualboost.notification" displayType="BALLOON" key="visualboost.error.title"
+                           order="first" os="windows" bundle="i18n" icon="AllIcons.Actions.Install"/>
+
+
+        <!-- Settings -->
+
+        <applicationService
+            serviceImplementation="visualboost.plugin.settings.VbPluginSettingsState"/>
+
+        <projectConfigurable
+            parentId="tools"
+            instance="visualboost.plugin.settings.VbPluginSettingsConfigurable"
+            id="visualboost.plugin.settings.VbPluginSettingsConfigurable"
+            displayName="VisualBoost"/>
+
+
+    </extensions>
+
+
+    <actions>
+        <action id="visualboost.plugin.actions.SyncAction" class="visualboost.plugin.actions.SyncAction"
+                text="Synchronize with VB" description="Synchronize your custom business logic with VisualBoost"
+                icon="/icons/logo_15x15.png">
+            <add-to-group group-id="EditorPopupMenu" anchor="last"/>
+        </action>
+
+        <action id="visualboost.plugin.actions.OpenSettingsAction"
+                class="visualboost.plugin.actions.OpenSettingsAction" text="Open Settings"
+                description="Open VisualBoost Settings"/>
+    </actions>
+</idea-plugin>

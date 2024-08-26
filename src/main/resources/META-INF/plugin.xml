@@ -13,12 +13,21 @@
     <!-- Description of the plugin displayed on the Plugin Page and IDE Plugin Manager.
          Simple HTML elements (text formatting, paragraphs, and lists) can be added inside of <![CDATA[ ]]> tag.
          Guidelines: https://plugins.jetbrains.com/docs/marketplace/plugin-overview-page.html#plugin-description -->
-    <description>Unlock your software development potential effortlessly with VisualBoost! Our web-based application assists developers in implementing both backend and frontend applications, freeing them to focus on business logic while automating redundant tasks. VisualBoost empowers you to design comprehensive software architectures and seamlessly transform them into fully functional backend applications with corresponding client code. The resulting product is entirely yours to own. Furthermore, VisualBoost allows customization of the generated code, with any adjustments seamlessly integrated back into the overarching concept. Accelerate your development process and amplify productivity with VisualBoost!</description>
+    <description>Unlock your software development potential effortlessly with VisualBoost! Our web-based application
+        assists developers in implementing both backend and frontend applications, freeing them to focus on business
+        logic while automating redundant tasks. VisualBoost empowers you to design comprehensive software architectures
+        and seamlessly transform them into fully functional backend applications with corresponding client code. The
+        resulting product is entirely yours to own. Furthermore, VisualBoost allows customization of the generated code,
+        with any adjustments seamlessly integrated back into the overarching concept. Accelerate your development
+        process and amplify productivity with VisualBoost!
+    </description>
 
     <!-- Product and plugin compatibility requirements.
          Read more: https://plugins.jetbrains.com/docs/intellij/plugin-compatibility.html -->
     <depends>com.intellij.modules.platform</depends>
-    <depends>org.jetbrains.android</depends>
+    <depends>com.intellij.modules.javascript</depends>
+    <depends>Git4Idea</depends>
+    <depends>Docker</depends>
 
     <!-- Extension points defined by the plugin.
          Read more: https://plugins.jetbrains.com/docs/intellij/plugin-extension-points.html -->
@@ -30,31 +39,126 @@
         <notificationGroup id="visualboost.notification" displayType="BALLOON" key="visualboost.error.title"
                            order="first" os="windows" bundle="i18n" icon="AllIcons.Actions.Install"/>
 
-
         <!-- Settings -->
-
         <applicationService
-            serviceImplementation="visualboost.plugin.settings.VbPluginSettingsState"/>
+                serviceImplementation="visualboost.plugin.settings.VbAppSettings"/>
 
         <projectConfigurable
-            parentId="tools"
-            instance="visualboost.plugin.settings.VbPluginSettingsConfigurable"
-            id="visualboost.plugin.settings.VbPluginSettingsConfigurable"
-            displayName="VisualBoost"/>
+                parentId="language"
+                instance="visualboost.plugin.settings.VbPluginSettingsConfigurable"
+                id="visualboost.plugin.settings.VbPluginSettingsConfigurable"
+                displayName="VisualBoost"
+                nonDefaultProject="true"
+        />
 
+        <!-- Wizard to init VBProject -->
+        <directoryProjectGenerator implementation="visualboost.plugin.intellijProject.VBProjectGenerator"
+                                   id="VbWebProject"/>
+
+        <defaultLiveTemplates file="/liveTemplates/VisualBoostLiveTemplate.xml"/>
+        <liveTemplateContext
+                contextId="MARKDOWN"
+                implementation="visualboost.plugin.livetemplate.VisualBoostLiveTemplateContext"/>
+
+        <liveTemplateMacro
+                implementation="visualboost.plugin.livetemplate.macros.RequestBodyMacro"/>
+
+        <!-- On Startup -->
+        <postStartupActivity implementation="visualboost.plugin.services.VbPostStartupActivity"/>
+
+        <editorFloatingToolbarProvider implementation="visualboost.plugin.editor.VbEditorFloatingToolbarProvider"/>
 
     </extensions>
 
-
     <actions>
-        <action id="visualboost.plugin.actions.SyncAction" class="visualboost.plugin.actions.SyncAction"
-                text="Synchronize with VB" description="Synchronize your custom business logic with VisualBoost"
-                icon="/icons/logo_15x15.png">
+        <group
+                id="visualboost.plugin.action_group.EditorContextMenu"
+                text="VisualBoost"
+                icon="/icons/logo_15x15.png"
+        >
             <add-to-group group-id="EditorPopupMenu" anchor="last"/>
-        </action>
+            <separator/>
+            <action id="visualboost.plugin.editor.contextmenu.actions.SyncAction" class="visualboost.plugin.actions.SyncAction"
+                    text="Synchronize Extension"
+                    description="Synchronize your custom business logic with VisualBoost"
+                    icon="/icons/logo_15x15.png">
+            </action>
+        </group>
+
+
+        <!-- Add extension files -->
+        <group
+                id="visualboost.plugin.action_group.NewGroup"
+                text="VisualBoost"
+                icon="/icons/logo_15x15.png"
+        >
+            <add-to-group group-id="NewGroup" anchor="last"/>
+
+            <separator/>
+            <action id="visualboost.plugin.actions.ShowCreateExtensionPopupAction"
+                    class="visualboost.plugin.actions.ShowCreateExtensionPopupAction"
+                    text="Extension"
+                    icon="AllIcons.Actions.AddFile">
+            </action>
+        </group>
 
         <action id="visualboost.plugin.actions.OpenSettingsAction"
                 class="visualboost.plugin.actions.OpenSettingsAction" text="Open Settings"
                 description="Open VisualBoost Settings"/>
+
+        <group
+                id="visualboost.plugin.action_group.ProjectContextMenu"
+                text="VisualBoost"
+                popup="true"
+                icon="/icons/logo_15x15.png"
+        >
+            <add-to-group group-id="ProjectViewPopupMenu" anchor="last"/>
+
+            <separator/>
+
+            <action id="visualboost.plugin.actions.InitProjectAction"
+                    class="visualboost.plugin.actions.InitProjectAction"
+                    text="Init Project"
+                    icon="AllIcons.General.GearPlain">
+            </action>
+        </group>
+
+
+        <group
+                id="visualboost.plugin.action_group.toolbar"
+                text="VisualBoost"
+        >
+            <separator/>
+
+            <action id="visualboost.plugin.actions.Label" class="visualboost.plugin.actions.ToolBarLabel">
+            </action>
+
+            <action id="visualboost.plugin.actions.ReloadVB" class="visualboost.plugin.actions.ReloadVbAction"
+                    text="Reload" description="Reload VisualBoost" icon="AllIcons.Toolwindows.SettingSync">
+            </action>
+            <action id="visualboost.plugin.actions.ZoomIn" class="visualboost.plugin.actions.ZoomInAction"
+                    text="Zoom In" icon="AllIcons.General.ZoomIn">
+            </action>
+
+            <action id="visualboost.plugin.actions.ZoomOut" class="visualboost.plugin.actions.ZoomOutAction"
+                    text="Zoom Out" icon="AllIcons.General.ZoomOut">
+            </action>
+            <add-to-group group-id="ToolbarRunGroup" anchor="last"/>
+        </group>
+
+        <action id="visualboost.plugin.actions.OpenDockerPluginWebsiteAction"
+                class="visualboost.plugin.actions.OpenDockerPluginWebsiteAction" text="Install Plugin"/>
+
+        <action id="visualboost.plugin.actions.LoadProjectConfigurationAction"
+                class="visualboost.plugin.actions.LoadProjectConfigurationAction" text="Reload VisualBoost Configuration"/>
+
+        <action id="visualboost.plugin.actions.ShowIntroductionDialogAction"
+                class="visualboost.plugin.actions.ShowIntroductionDialogAction" text="Show Introduction Dialog (VisualBoost)"/>
+
+        <group id="visualboost.editor.floating_toolbar" class="visualboost.plugin.editor.VbEditorFloatingActionGroup">
+            <action id="visualboost.plugin.editor.toolbar.actions.SyncAction" class="visualboost.plugin.actions.SyncAction" icon="AllIcons.Toolwindows.SettingSync" text="Synchronize Extension"/>
+        </group>
+
     </actions>
+
 </idea-plugin>

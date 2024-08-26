@@ -1,0 +1,16 @@
+## Directories ######################################################################################
+DIR_GEN_ROUTES=${dir_routes_gen}
+DIR_EXT_ROUTES=${dir_routes_ext}
+
+## Express ######################################################################################
+PORT=${http_port}
+
+## Mongo-DB #####################################################################################
+MONGO_SERVER=${db_domain}
+MONGO_PORT=${db_port}
+MONGO_DB_NAME=${db_name}
+MONGO_USER=${db_user}
+MONGO_PASSWORD=${db_password}
+
+## Security #####################################################################################
+API_KEY=${api_key}

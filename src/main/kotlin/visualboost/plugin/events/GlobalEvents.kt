@@ -1,10 +1,10 @@
 package visualboost.plugin.events
 
-import visualboost.plugin.settings.VbPluginSettingsState
+import visualboost.plugin.settings.VbAppSettings
 
 object GlobalEvents {
 
-    var onSettingsApply: ((settings: VbPluginSettingsState) -> Unit)? = null
-    var onUrlChanged: ((url: String) -> Unit)? = null
+    var onSettingsApply: ((settings: VbAppSettings) -> Unit)? = null
+    var onProjectChanged: ((projectId: String) -> Unit)? = null
 
 }

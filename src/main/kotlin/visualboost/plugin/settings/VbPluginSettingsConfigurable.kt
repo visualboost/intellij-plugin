@@ -8,6 +8,8 @@ import javax.swing.JComponent
 class VbPluginSettingsConfigurable(val project: Project) : Configurable{
 
     lateinit var component: VbPluginSettingsComponent
+    private val appSettings = VbAppSettings.getInstance()
+    private val projectSettings = VbProjectSettings.getInstance(project)
 
     override fun createComponent(): JComponent {
         component = VbPluginSettingsComponent(project)
@@ -15,48 +17,51 @@ class VbPluginSettingsConfigurable(val project: Project) : Configurable{
     }
 
     override fun isModified(): Boolean {
-        val url = component.getUrl()
         val target = component.getTarget()
-        val projectId = component.getProjectId()
 
-        val settings = VbPluginSettingsState.getInstance()
-        val urlModified = url != settings.url
-        val targetModified = target != settings.target
-        val projectIdModified = projectId != settings.projectId
+        val targetModified = target != projectSettings.target
+        val useDefaultUrl = !component.useCustomUrlIsSelected()
+        val useCustomUrlIsModified = appSettings.useDefaultUrl != useDefaultUrl
 
-        val paramsAreModified = urlModified || targetModified || projectIdModified
-        val paramsAreValid = url.isNotBlank() && target != null
-
-        return paramsAreModified && paramsAreValid
+        return targetModified || projectIdIsModified() || useCustomUrlIsModified
     }
 
     override fun apply() {
-        val settings = VbPluginSettingsState.getInstance()
-
-        val urlModified = component.getUrl() != settings.url
-        if(urlModified){
-            settings.url = component.getUrl()
-            GlobalEvents.onUrlChanged?.invoke(settings.url)
-        }
-
-        val targetModified = component.getTarget() != settings.target
+        val targetModified = component.getTarget() != projectSettings.target
         if(targetModified){
-            settings.target = component.getTarget()
+            projectSettings.target = component.getTarget()
         }
 
-        val projectIdModified = component.getProjectId() != settings.projectId
-        if(projectIdModified){
-            settings.projectId = component.getProjectId()
+        if(projectIdIsModified()){
+            projectSettings.projectId = component.getProject()?._id
+
+            if(projectSettings.projectId != null){
+                GlobalEvents.onProjectChanged?.invoke(projectSettings.projectId!!)
+            }
         }
 
-        GlobalEvents.onSettingsApply?.invoke(settings)
+        val useDefaultUrl = !component.useCustomUrlIsSelected()
+        val useCustomUrlIsModified = appSettings.useDefaultUrl != useDefaultUrl
+        if(useCustomUrlIsModified){
+            appSettings.useDefaultUrl = useDefaultUrl
+
+            if(!appSettings.useDefaultUrl){
+                appSettings.defaultUrl = component.getDefaultUrl()
+                appSettings.mainUrl = component.getMainUrl()
+                appSettings.authUrl = component.getAuthUrl()
+            }
+        }
+
+        GlobalEvents.onSettingsApply?.invoke(appSettings)
+    }
+
+    private fun projectIdIsModified(): Boolean{
+        val projectId = component.getProject()?._id
+        return projectId != projectSettings.projectId
     }
 
     override fun reset() {
-        val settings = VbPluginSettingsState.getInstance()
-        component.setUrl(settings.url)
-        component.setTarget(settings.target)
-        component.setProjectId(settings.projectId)
+        component.setTarget(projectSettings.target)
     }
 
     override fun getDisplayName(): String {

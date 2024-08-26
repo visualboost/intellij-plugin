@@ -1,0 +1,90 @@
+<templateSet group="VisualBoost">
+    <template name="get" value="/**&#10; * $DESCRIPTION$&#10; *&#10; * @name: $FUNCTION_NAME$&#10; *&#10; * @return: $RETURN_DESCR$&#10; *&#10; * @errors: $ERRORS$&#10; *&#10; **/&#10;router.get(&quot;/$PATH$&quot;, async (req, res, next) =&gt; {&#10;&#10;        $CODE$&#10;&#10;});" description="Create a custom GET handler (VisualBoost)" toReformat="true" toShortenFQNames="true">
+        <variable name="DESCRIPTION" expression="&quot;This is a GET function - describe it here.\n* After defining the function (name, body, return, errors, path), you can either run 'Synchronize with VisualBoost' via the context menu or simply save the file.\n* By synchronizing with VisualBoost, your function will be integrated into VisualBoost and automatically made available on the client side when a build is performed.\n* Additionally, your functionality will be automatically included in the documentation.&quot;" defaultValue="" alwaysStopAt="true" />
+        <variable name="FUNCTION_NAME" expression="&quot;functionName&quot;" defaultValue="" alwaysStopAt="true" />
+        <variable name="RETURN_DESCR" expression="&quot;Enter \&quot;type\&quot;, \&quot;enum\&quot;,  \&quot;object\&quot; or \&quot;array\&quot; to choose the relevant live template.&quot;" defaultValue="" alwaysStopAt="true" />
+        <variable name="ERRORS" expression="&quot;Enter \&quot;errors\&quot; to use existing live templates.&quot;" defaultValue="" alwaysStopAt="true" />
+        <variable name="PATH" expression="&quot;custom/route&quot;" defaultValue="" alwaysStopAt="true" />
+        <variable name="CODE" expression="&quot;/**\n* Add your custom business logic\n**/&quot;" defaultValue="" alwaysStopAt="true" />
+        <context>
+            <option name="JAVA_SCRIPT" value="true" />
+        </context>
+    </template>
+    <template name="object" value="{&#10; *      $PARAM1$: $VALUE0$,&#10; *      $PARAM2$: $VALUE1$,&#10; *      $PARAM3$: $VALUE2$&#10; * }" description="Define a request body or response body object" toReformat="true" toShortenFQNames="true">
+        <variable name="PARAM1" expression="" defaultValue="param1" alwaysStopAt="true" />
+        <variable name="VALUE0" expression="enum(&quot;Boolean&quot;, &quot;Int&quot;, &quot;Float&quot;, &quot;String&quot;, &quot;Date&quot;, &quot;Location&quot;, &quot;enum&quot;, &quot;object&quot;, &quot;array&quot;)" defaultValue="" alwaysStopAt="true" />
+        <variable name="PARAM2" expression="" defaultValue="param2" alwaysStopAt="true" />
+        <variable name="VALUE1" expression="enum(&quot;Boolean&quot;, &quot;Int&quot;, &quot;Float&quot;, &quot;String&quot;, &quot;Date&quot;, &quot;Location&quot;, &quot;enum&quot;, &quot;object&quot;, &quot;array&quot;)" defaultValue="" alwaysStopAt="true" />
+        <variable name="PARAM3" expression="" defaultValue="param3" alwaysStopAt="true" />
+        <variable name="VALUE2" expression="enum(&quot;Boolean&quot;, &quot;Int&quot;, &quot;Float&quot;, &quot;String&quot;, &quot;Date&quot;, &quot;Location&quot;, &quot;enum&quot;, &quot;object&quot;, &quot;array&quot;)" defaultValue="" alwaysStopAt="true" />
+        <context>
+            <option name="JAVA_SCRIPT" value="true" />
+        </context>
+    </template>
+    <template name="type" value="$VALUE$" description="Define a simple type (VisualBoost)" toReformat="false" toShortenFQNames="true">
+        <variable name="VALUE" expression="enum(&quot;Boolean&quot;, &quot;Int&quot;, &quot;Float&quot;, &quot;String&quot;, &quot;Date&quot;, &quot;Location&quot;)" defaultValue="" alwaysStopAt="true" />
+        <context>
+            <option name="JAVA_SCRIPT" value="true" />
+        </context>
+    </template>
+    <template name="enum" value="$ENUM_NAME$($VALUE1$, $VALUE2$, $VALUE3$)" description="Define an enumeration (VisualBoost)" toReformat="false" toShortenFQNames="true">
+        <variable name="ENUM_NAME" expression="&quot;EnumName&quot;" defaultValue="" alwaysStopAt="true" />
+        <variable name="VALUE1" expression="&quot;VALUE1&quot;" defaultValue="" alwaysStopAt="true" />
+        <variable name="VALUE2" expression="&quot;VALUE2&quot;" defaultValue="" alwaysStopAt="true" />
+        <variable name="VALUE3" expression="&quot;VALUE2&quot;" defaultValue="" alwaysStopAt="true" />
+        <context>
+            <option name="JAVA_SCRIPT" value="true" />
+        </context>
+    </template>
+    <template name="errors" value="{&#10; *     $ERROR_CODE_1$: $ERROR_MSG_1$,&#10; *     $ERROR_CODE_2$: $ERROR_MSG_2$&#10; * }" description="Define the errors of your function (VisualBoost)" toReformat="true" toShortenFQNames="true">
+        <variable name="ERROR_CODE_1" expression="&quot;400&quot;" defaultValue="" alwaysStopAt="true" />
+        <variable name="ERROR_MSG_1" expression="&quot;\&quot;Bad Request\&quot;&quot;" defaultValue="" alwaysStopAt="true" />
+        <variable name="ERROR_CODE_2" expression="&quot;500&quot;" defaultValue="" alwaysStopAt="true" />
+        <variable name="ERROR_MSG_2" expression="&quot;\&quot;Internal Server Error\&quot;&quot;" defaultValue="" alwaysStopAt="true" />
+        <context>
+            <option name="JAVA_SCRIPT" value="true" />
+        </context>
+    </template>
+    <template name="array" value="[$ARRAY_VAR$]" description="Define an array (VisualBoost)" toReformat="true" toShortenFQNames="true">
+        <variable name="ARRAY_VAR" expression="enum(&quot;Boolean&quot;, &quot;Int&quot;, &quot;Float&quot;, &quot;String&quot;, &quot;Date&quot;, &quot;Location&quot;, &quot;enum&quot;, &quot;object&quot;, &quot;array&quot;)" defaultValue="" alwaysStopAt="true" />
+        <context>
+            <option name="JAVA_SCRIPT" value="true" />
+        </context>
+    </template>
+    <template name="post" value="/**&#10; * $DESCRIPTION$&#10; *&#10; * @name: $FUNCTION_NAME$&#10; *&#10; * @body: $BODY_DESCR$&#10; *&#10; * @return: $RETURN_DESCR$&#10; *&#10; * @errors: $ERRORS$&#10; *&#10; **/&#10;router.post(&quot;/$PATH$&quot;, async (req, res, next) =&gt; {&#10;&#10;        $CODE$&#10;&#10;});" description="Create a custom POST handler (VisualBoost)" toReformat="true" toShortenFQNames="true">
+        <variable name="DESCRIPTION" expression="&quot;This is a POST function - describe it here.\n* After defining the function (name, body, return, errors, path), you can either run 'Synchronize with VisualBoost' via the context menu or simply save the file.\n* By synchronizing with VisualBoost, your function will be integrated into VisualBoost and automatically made available on the client side when a build is performed.\n* Additionally, your functionality will be automatically included in the documentation.&quot;" defaultValue="" alwaysStopAt="true" />
+        <variable name="FUNCTION_NAME" expression="&quot;functionName&quot;" defaultValue="" alwaysStopAt="true" />
+        <variable name="BODY_DESCR" expression="&quot;Enter \&quot;type\&quot;, \&quot;enum\&quot;,  \&quot;object\&quot; or \&quot;array\&quot; to choose the relevant live template.&quot;" defaultValue="" alwaysStopAt="true" />
+        <variable name="RETURN_DESCR" expression="&quot;Enter \&quot;type\&quot;, \&quot;enum\&quot;,  \&quot;object\&quot; or \&quot;array\&quot; to choose the relevant live template.&quot;" defaultValue="" alwaysStopAt="true" />
+        <variable name="ERRORS" expression="&quot;Enter \&quot;errors\&quot; to use existing live templates.&quot;" defaultValue="" alwaysStopAt="true" />
+        <variable name="PATH" expression="&quot;custom/route&quot;" defaultValue="" alwaysStopAt="true" />
+        <variable name="CODE" expression="&quot;/**\n* Add your custom business logic\n**/&quot;" defaultValue="" alwaysStopAt="true" />
+        <context>
+            <option name="JAVA_SCRIPT" value="true" />
+        </context>
+    </template>
+    <template name="put" value="/**&#10; * $DESCRIPTION$&#10; *&#10; * @name: $FUNCTION_NAME$&#10; *&#10; * @body: $BODY_DESCR$&#10; *&#10; * @return: $RETURN_DESCR$&#10; *&#10; * @errors: $ERRORS$&#10; *&#10; **/&#10;router.put(&quot;/$PATH$&quot;, async (req, res, next) =&gt; {&#10;&#10;        $CODE$&#10;&#10;});" description="Create a custom PUT handler (VisualBoost)" toReformat="true" toShortenFQNames="true">
+        <variable name="DESCRIPTION" expression="&quot;This is a PUT function - describe it here.\n* After defining the function (name, body, return, errors, path), you can either run 'Synchronize with VisualBoost' via the context menu or simply save the file.\n* By synchronizing with VisualBoost, your function will be integrated into VisualBoost and automatically made available on the client side when a build is performed.\n* Additionally, your functionality will be automatically included in the documentation.&quot;" defaultValue="" alwaysStopAt="true" />
+        <variable name="FUNCTION_NAME" expression="&quot;functionName&quot;" defaultValue="" alwaysStopAt="true" />
+        <variable name="BODY_DESCR" expression="&quot;Enter \&quot;type\&quot;, \&quot;enum\&quot;,  \&quot;object\&quot; or \&quot;array\&quot; to choose the relevant live template.&quot;" defaultValue="" alwaysStopAt="true" />
+        <variable name="RETURN_DESCR" expression="&quot;Enter \&quot;type\&quot;, \&quot;enum\&quot;,  \&quot;object\&quot; or \&quot;array\&quot; to choose the relevant live template.&quot;" defaultValue="" alwaysStopAt="true" />
+        <variable name="ERRORS" expression="&quot;Enter \&quot;errors\&quot; to use existing live templates.&quot;" defaultValue="" alwaysStopAt="true" />
+        <variable name="PATH" expression="&quot;custom/route&quot;" defaultValue="" alwaysStopAt="true" />
+        <variable name="CODE" expression="&quot;/**\n* Add your custom business logic\n**/&quot;" defaultValue="" alwaysStopAt="true" />
+        <context>
+            <option name="JAVA_SCRIPT" value="true" />
+        </context>
+    </template>
+    <template name="delete" value="/**&#10; * $DESCRIPTION$&#10; *&#10; * @name: $FUNCTION_NAME$&#10; *&#10; * @body: $BODY_DESCR$&#10; *&#10; * @return: $RETURN_DESCR$&#10; *&#10; * @errors: $ERRORS$&#10; *&#10; **/&#10;router.delete(&quot;/$PATH$&quot;, async (req, res, next) =&gt; {&#10;&#10;        $CODE$&#10;&#10;});" description="Create a custom DELETE handler (VisualBoost)" toReformat="true" toShortenFQNames="true">
+        <variable name="DESCRIPTION" expression="&quot;This is a DELETE function - describe it here.\n* After defining the function (name, body, return, errors, path), you can either run 'Synchronize with VisualBoost' via the context menu or simply save the file.\n* By synchronizing with VisualBoost, your function will be integrated into VisualBoost and automatically made available on the client side when a build is performed.\n* Additionally, your functionality will be automatically included in the documentation.&quot;" defaultValue="" alwaysStopAt="true" />
+        <variable name="FUNCTION_NAME" expression="&quot;functionName&quot;" defaultValue="" alwaysStopAt="true" />
+        <variable name="BODY_DESCR" expression="&quot;Enter \&quot;type\&quot;, \&quot;enum\&quot;,  \&quot;object\&quot; or \&quot;array\&quot; to choose the relevant live template.&quot;" defaultValue="" alwaysStopAt="true" />
+        <variable name="RETURN_DESCR" expression="&quot;Enter \&quot;type\&quot;, \&quot;enum\&quot;,  \&quot;object\&quot; or \&quot;array\&quot; to choose the relevant live template.&quot;" defaultValue="" alwaysStopAt="true" />
+        <variable name="ERRORS" expression="&quot;Enter \&quot;errors\&quot; to use existing live templates.&quot;" defaultValue="" alwaysStopAt="true" />
+        <variable name="PATH" expression="&quot;custom/route&quot;" defaultValue="" alwaysStopAt="true" />
+        <variable name="CODE" expression="&quot;/**\n* Add your custom business logic\n**/&quot;" defaultValue="" alwaysStopAt="true" />
+        <context>
+            <option name="JAVA_SCRIPT" value="true" />
+        </context>
+    </template>
+</templateSet>

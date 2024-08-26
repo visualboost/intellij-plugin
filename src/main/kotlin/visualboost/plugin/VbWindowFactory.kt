@@ -8,9 +8,11 @@ import com.intellij.openapi.wm.ToolWindowFactory
 class VbWindowFactory: ToolWindowFactory {
 
     override fun createToolWindowContent(project: Project, toolWindow: ToolWindow) {
-        val vbWindowService = project.getService(VbWindowService::class.java).vbWindow
+        val vbWindow = project.getService(VbWindowService::class.java).vbWindow
         val component = toolWindow.component
-        component.parent.add(vbWindowService.content)
+
+        vbWindow.initBrowser(toolWindow.disposable)
+        component.parent.add(vbWindow.content)
     }
 
 }

@@ -1,0 +1,22 @@
+const router = require("express").Router();
+const mongoose = require("mongoose");
+const ${model_name} = require("${path_to_model}");
+
+ /**
+  * This file can contain your custom business logic.
+  *
+  * All REST functions in this file can be added to the "${model_name}" model.
+  * To add a custom function, use a live template.
+  *
+  * Type "get", "post", "put", or "delete", select the relevant live template, and press ENTER to add a new REST function.
+  *
+  * Further {@link https://www.jetbrains.com/help/idea/using-live-templates.html#live_templates_types Live Templates} can be used as follows:
+  *
+  * - type: Data types that are supported by VisualBoost
+  * - enum: A template for an enumeration
+  * - object: A template for an object
+  * - array: A template for an array
+  * - errors: Template for REST function errors
+  */
+
+module.exports = router;

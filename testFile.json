@@ -1,0 +1,4 @@
+{
+  "fileName": "Label.js",
+  "fileContent": "const router = require(\"express\").Router();\n\n/**\n * This is an example of a custom function\n *\n * @name: myCustomFunction\n *\n * @body: {\n *    name: string\n * }\n *\n * @return: {\n *     result: string\n * }\n *\n * @errors: {\n *     400: \"Bad Request\"\n * }\n **/\nrouter.post(\"/custom/route/:some_path_param\", async (req, res, next) => {\n\n    /**\n     * Add some business logic here...\n     */\n\n});\n\nmodule.exports = router;"
+}

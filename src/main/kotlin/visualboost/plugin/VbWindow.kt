@@ -1,18 +1,21 @@
 package visualboost.plugin
 
 import com.google.gson.reflect.TypeToken
-import com.intellij.notification.NotificationGroupManager
-import com.intellij.notification.NotificationType
-import com.intellij.openapi.actionSystem.AnAction
+import com.intellij.openapi.Disposable
 import com.intellij.openapi.options.ShowSettingsUtil
+import com.intellij.openapi.progress.ProgressIndicator
+import com.intellij.openapi.progress.ProgressManager
+import com.intellij.openapi.progress.Task
+import com.intellij.openapi.progress.util.ProgressWindow
 import com.intellij.openapi.project.Project
 import com.intellij.openapi.roots.ProjectRootManager
 import com.intellij.openapi.util.Disposer
 import com.intellij.openapi.vfs.LocalFileSystem
-import com.intellij.openapi.vfs.VfsUtil
 import com.intellij.ui.jcef.JBCefBrowser
 import com.intellij.ui.jcef.JBCefBrowserBase
+import com.intellij.ui.jcef.JBCefCookie
 import com.intellij.ui.jcef.JBCefJSQuery
+import kotlinx.coroutines.*
 import org.cef.browser.CefBrowser
 import org.cef.browser.CefFrame
 import org.cef.callback.CefContextMenuParams
@@ -21,46 +24,66 @@ import org.cef.handler.CefContextMenuHandler
 import org.cef.handler.CefLoadHandler
 import org.cef.network.CefRequest
 import visualboost.plugin.actions.OpenSettingsAction
+import visualboost.plugin.api.API
+import visualboost.plugin.api.models.JwtContent
+import visualboost.plugin.api.models.plan.Plan
+import visualboost.plugin.api.models.user.ActivationState
+import visualboost.plugin.components.VbWebview
 import visualboost.plugin.events.GlobalEvents
-import visualboost.plugin.icons.IconRes
 import visualboost.plugin.models.GSON
 import visualboost.plugin.models.GenerationProcess
 import visualboost.plugin.settings.VbPluginSettingsConfigurable
-import visualboost.plugin.settings.VbPluginSettingsState
+import visualboost.plugin.settings.VbAppSettings
+import visualboost.plugin.settings.VbProjectSettings
+import visualboost.plugin.util.*
 import java.awt.BorderLayout
 import java.awt.GridBagConstraints
 import java.awt.GridBagLayout
 import java.awt.Insets
-import java.io.BufferedReader
 import java.io.File
-import java.rmi.UnexpectedException
-import java.util.concurrent.TimeUnit
-import javax.swing.*
+import java.net.URLEncoder
+import javax.swing.JButton
+import javax.swing.JComponent
+import javax.swing.JLabel
+import javax.swing.JPanel
 
 
-class VbWindow(val project: Project) {
+class VbWindow(val project: Project) : CoroutineScope {
 
-    val webView = JBCefBrowser()
+    override val coroutineContext = Dispatchers.Default + SupervisorJob()
+
+    lateinit var vbBrowser: VbWebview
+    lateinit var jcefBrowser: JBCefBrowser
+    lateinit var jsQuery: JBCefJSQuery
+
     var content: JPanel = JPanel()
-    var jsQuery = JBCefJSQuery.create((webView as JBCefBrowserBase))
 
-    val settings = VbPluginSettingsState.getInstance()
+    val appSettings = VbAppSettings.getInstance()
+    val projectSettings = VbProjectSettings.getInstance(project)
 
     init {
         content.layout = BorderLayout()
+    }
+
+    fun initBrowser(disposable: Disposable){
+        vbBrowser = VbWebview(disposable)
+        jcefBrowser = vbBrowser.browser
+        jsQuery = JBCefJSQuery.create((jcefBrowser as JBCefBrowserBase))
 
         GlobalEvents.onSettingsApply = {
-            if (!it.isValid()) {
+            displayWindowContent(it)
+        }
+
+        displayWindowContent(appSettings)
+    }
+
+    private fun displayWindowContent(settings: VbAppSettings) {
+        launch {
+            if (!projectSettings.projectTargetIsSet() || !CredentialUtil.isUserLoggedIn() || !projectSettings.projectSelected()) {
                 showFallbackComponent(project)
             } else {
                 showWebviewComponent(project)
             }
-        }
-
-        if (!settings.isValid()) {
-            showFallbackComponent(project)
-        } else {
-            showWebviewComponent(project)
         }
     }
 
@@ -88,7 +111,39 @@ class VbWindow(val project: Project) {
         val browserComponent = initBrowser(project)
         content.add(browserComponent, BorderLayout.CENTER)
         content.updateUI()
+
+        val projectId = projectSettings.projectId
+        if (projectId != null) {
+            loadAndDisplayProject(projectId)
+        }
     }
+
+    fun loadAndDisplayProject(projectId: String) {
+        launch {
+            val token = withContext(Dispatchers.IO) {
+                API.fetchToken()
+            } ?: return@launch
+
+            //set jwt as session token
+            setJwtCookie(token)
+
+            val jwtContent = JwtContent.fromJwt(token)
+            val plan = withContext(Dispatchers.IO) {
+                API.getPlan(token, jwtContent.tenantId)
+            }
+            setPlanCookie(plan)
+
+            val userState = withContext(Dispatchers.IO) {
+                API.getUserState(token, jwtContent.userId)
+            }
+            setUserActivationState(userState)
+
+            val vbUrl = API.getProjectUrl(projectId)
+            jcefBrowser.loadURL(vbUrl)
+            content.updateUI()
+        }
+    }
+
 
     private fun initFallbackComponent(project: Project): JPanel {
         val fallbackComponent = JPanel()
@@ -118,22 +173,84 @@ class VbWindow(val project: Project) {
 
     private fun initBrowser(project: Project): JComponent {
         //Reload when url changed
-        GlobalEvents.onUrlChanged = {
-            webView.loadURL(it)
+        GlobalEvents.onProjectChanged = {
+            loadAndDisplayProject(it)
         }
 
-        val vbUrl = settings.url
-        webView.loadURL(vbUrl)
-        Disposer.register(project, webView)
+        Disposer.register(project, jcefBrowser)
 
         initContextMenu()
         initEventListener(project)
         injectJsEvent()
+
+        initLoadHandler()
 //        initFileDownloadHandler()
 //        initDisplayHandle(project)
 
-        webView.component.name = "WebviewComponent"
-        return webView.component
+        jcefBrowser.component.name = "WebviewComponent"
+        return jcefBrowser.component
+    }
+
+    private fun initLoadHandler() {
+        jcefBrowser.jbCefClient.addLoadHandler(object : CefLoadHandler {
+            override fun onLoadingStateChange(
+                browser: CefBrowser?,
+                isLoading: Boolean,
+                canGoBack: Boolean,
+                canGoForward: Boolean
+            ) {
+            }
+
+            override fun onLoadStart(
+                browser: CefBrowser?,
+                frame: CefFrame?,
+                transitionType: CefRequest.TransitionType?
+            ) {
+            }
+
+            override fun onLoadEnd(browser: CefBrowser, frame: CefFrame?, httpStatusCode: Int) {
+                jcefBrowser.zoomLevel = projectSettings.zoomLevel
+            }
+
+            override fun onLoadError(
+                browser: CefBrowser?,
+                frame: CefFrame?,
+                errorCode: CefLoadHandler.ErrorCode?,
+                errorText: String?,
+                failedUrl: String?
+            ) {
+            }
+
+        }, jcefBrowser.cefBrowser)
+    }
+
+    private fun setUserActivationState(userState: ActivationState) {
+        jcefBrowser.jbCefCookieManager.setCookie(
+            API.getAppUrl(),
+            JBCefCookie("state", userState.toString(), API.DOMAIN, "/", true, false)
+        ).get()
+    }
+
+    private fun setPlanCookie(plan: Plan) {
+        val urlEncodedPlan = URLEncoder.encode(plan.toJsonString(), "utf-8")
+        val planCookie = jcefBrowser.jbCefCookieManager.setCookie(
+            API.getAppUrl(),
+            JBCefCookie(
+                "plan",
+                urlEncodedPlan,
+                API.DOMAIN,
+                "/",
+                true,
+                false
+            )
+        ).get()
+    }
+
+    private fun setJwtCookie(token: String) {
+        jcefBrowser.jbCefCookieManager.setCookie(
+            API.getAppUrl(),
+            JBCefCookie("jwt", token, API.DOMAIN, "/", true, false)
+        ).get()
     }
 
 
@@ -177,74 +294,92 @@ class VbWindow(val project: Project) {
     private fun initEventListener(project: Project) {
         jsQuery.addHandler { result: String ->
 
-            try {
-                val generationProcesses = getGenerationProcess(result)
+            val generationProcesses = getGenerationProcess(result)
 
-                val target = VbPluginSettingsState.getInstance().target
-                if (target == null) {
-                    showError(project, "Error", "No target configured for project. Skip pull repository.")
-                    return@addHandler null
-                }
-
-                /**
-                 * Validate if the current project is has the right target.
-                 * Example: If The user generated client code but the current intellij project is defined as backend project, we do not want to trigger a git pull.
-                 */
-                val process = generationProcesses.find { it.target == target } ?: return@addHandler null
-
-                /**
-                 * Check if set project is same as the current VB-Project
-                 */
-                val settings = VbPluginSettingsState.getInstance()
-                val settingsProjectId = settings.projectId
-                if (settingsProjectId != process.projectId) {
-                    return@addHandler null
-                }
-
-                val currentBranch = getCurrentBranch(project)
-                if (currentBranch == process.branch) {
-                    pull(project, process.branch)
-                    refreshSourceDir()
-
-                    showInfo(
-                        project,
-                        "Updated",
-                        "Successfully pulled Version ${process.version} from VisualBoost (Branch: ${process.branch}"
-                    )
-                } else {
-                    fetch(project, process.branch)
-                    showInfo(
-                        project,
-                        "Updated",
-                        "Successfully fetched Version ${process.version} from VisualBoost. Checkout the branch ${process.branch} to access your changes"
-                    )
-                }
-            } catch (e: Exception) {
-                showError(project, "Error", e.message ?: "")
+            val target = projectSettings.target
+            if (target == null) {
+                project.showError("Error", "No target configured for project. Skip pull repository.")
+                return@addHandler null
             }
 
+            /**
+             * Validate if the current project is has the right target.
+             * Example: If The user generated client code but the current intellij project is defined as backend project, we do not want to trigger a git pull.
+             */
+            val process = generationProcesses.find { it.target == target } ?: return@addHandler null
+
+            /**
+             * Check if set project is same as the current VB-Project
+             */
+            val settingsProjectId = projectSettings.projectId
+            if (settingsProjectId != process.projectId) {
+                return@addHandler null
+            }
+
+            pullAsync(process)
             null
         }
+    }
+
+    private fun pullAsync(process: GenerationProcess) {
+        val backgroundTask = object : Task.Backgroundable(project, "Pull data", true) {
+            override fun run(indicator: ProgressIndicator) {
+                indicator.text = "Pull version ${process.version}"
+                try {
+                    val currentBranch = getCurrentBranch(project)
+                    if (currentBranch == process.branch) {
+                        pull(project, process.branch)
+                        refreshSourceDir()
+
+                        project.showInfo(
+                            "Updated",
+                            "Successfully pulled Version ${process.version} from VisualBoost (Branch: ${process.branch}"
+                        )
+                    } else {
+                        fetch(project, process.branch)
+                        project.showInfo(
+                            "Updated",
+                            "Successfully fetched Version ${process.version} from VisualBoost. Checkout the branch ${process.branch} to access your changes"
+                        )
+                    }
+
+                } catch (e: Exception) {
+                    project.showError("Error", e.message ?: "")
+                }
+            }
+        }
+
+        val progressWindow = ProgressWindow(false, true, project)
+        ProgressManager.getInstance().runProcessWithProgressAsynchronously(backgroundTask, progressWindow)
+
     }
 
     /**
      * Reload the files from the physical file system
      */
     private fun refreshSourceDir() {
-        val contentRoots = ProjectRootManager.getInstance(project).contentRoots
-        val rootDirAsVf = contentRoots.firstOrNull() ?: return
-        val rootDir = File(rootDirAsVf.path)
-        val walk = rootDir.walk(FileWalkDirection.TOP_DOWN)
-        val sourceDir = walk.onEnter { it.name != "node_modules" }.find {
-            it.isDirectory && it.name == "src"
-        } ?: return
+        val sourceDir = getSourceDir() ?: return
 
-        val virtualSourceDir = LocalFileSystem.getInstance().findFileByIoFile(sourceDir) ?: return
+        val virtualSourceDir = LocalFileSystem.getInstance().refreshAndFindFileByIoFile(sourceDir) ?: return
         virtualSourceDir.refresh(true, true)
     }
 
+    private fun getSourceDir(): File? {
+        val rootDir = getRootDir() ?: return null
+        val walk = rootDir.walk(FileWalkDirection.TOP_DOWN)
+        return walk.onEnter { it.name != "node_modules" }.find {
+            it.isDirectory && it.name == "src"
+        }
+    }
+
+    fun getRootDir(): File? {
+        val contentRoots = ProjectRootManager.getInstance(project).contentRoots
+        val rootDirAsVf = contentRoots.firstOrNull() ?: return null
+        return File(rootDirAsVf.path)
+    }
+
     private fun injectJsEvent() {
-        webView.jbCefClient.addLoadHandler(object : CefLoadHandler {
+        jcefBrowser.jbCefClient.addLoadHandler(object : CefLoadHandler {
             override fun onLoadingStateChange(
                 browser: CefBrowser?,
                 isLoading: Boolean,
@@ -271,9 +406,9 @@ class VbWindow(val project: Project) {
     
                     """.trimIndent()
 
-                webView.cefBrowser.executeJavaScript(
+                jcefBrowser.cefBrowser.executeJavaScript(
                     injectedJavaScript,
-                    webView.cefBrowser.url, 0
+                    jcefBrowser.cefBrowser.url, 0
                 );
             }
 
@@ -286,11 +421,11 @@ class VbWindow(val project: Project) {
             ) {
             }
 
-        }, webView.cefBrowser)
+        }, jcefBrowser.cefBrowser)
     }
 
     private fun initContextMenu() {
-        webView.jbCefClient.addContextMenuHandler(object : CefContextMenuHandler {
+        jcefBrowser.jbCefClient.addContextMenuHandler(object : CefContextMenuHandler {
             override fun onBeforeContextMenu(
                 browser: CefBrowser,
                 frame: CefFrame,
@@ -310,7 +445,7 @@ class VbWindow(val project: Project) {
                 eventFlags: Int
             ): Boolean {
                 if (commandId == 50001) {
-                    webView.loadURL(webView.cefBrowser.url)
+                    reloadUrl()
                 }
                 return true
             }
@@ -318,28 +453,27 @@ class VbWindow(val project: Project) {
             override fun onContextMenuDismissed(browser: CefBrowser?, frame: CefFrame?) {
             }
 
-        }, webView.cefBrowser)
+        }, jcefBrowser.cefBrowser)
     }
 
-    fun String.runCommand(project: Project): String {
-        val workingDir = File(project.basePath)
-
-        val process = ProcessBuilder(*this.split(" ").toTypedArray())
-            .directory(workingDir)
-//            .redirectOutput(ProcessBuilder.Redirect.INHERIT)
-            .start()
-
-        process.waitFor(20, TimeUnit.SECONDS)
-        val returnValue = process.exitValue()
-
-        if (returnValue != 0) {
-            val errorMsg = BufferedReader(process.errorStream.reader()).readText()
-            throw UnexpectedException(errorMsg)
-        }
-
-        val result = BufferedReader(process.inputStream.reader()).readText()
-        return result
+    fun reloadUrl() {
+        jcefBrowser.loadURL(jcefBrowser.cefBrowser.url)
     }
+
+    fun zoomIn(zoomStep: Double = 0.1) {
+        if (jcefBrowser.zoomLevel >= 2.0) return
+        jcefBrowser.zoomLevel += zoomStep
+    }
+
+    fun zoomOut(zoomStep: Double = 0.1) {
+        if (jcefBrowser.zoomLevel <= 0.3) return
+        jcefBrowser.zoomLevel -= zoomStep
+    }
+
+    fun getZoomLevel(): Double {
+        return jcefBrowser.zoomLevel
+    }
+
 
     fun getGenerationProcess(processesAsJson: String): List<GenerationProcess> {
         val listType = object : TypeToken<List<GenerationProcess>>() {}.getType()
@@ -358,42 +492,15 @@ class VbWindow(val project: Project) {
         return "git branch --show-current".runCommand(project).replace("\n", "")
     }
 
-    fun showError(project: Project, title: String, msg: String, actions: List<AnAction> = emptyList()) {
-        showNotification(project, title, msg, NotificationType.ERROR, actions = actions)
-    }
-
-    fun showInfo(project: Project, title: String, msg: String) {
-        showNotification(project, title, msg, NotificationType.INFORMATION, IconRes.CheckIcon)
-    }
-
-    private fun showNotification(
-        project: Project,
-        title: String,
-        msg: String,
-        type: NotificationType,
-        icon: Icon? = null,
-        actions: List<AnAction> = emptyList()
-    ) {
-        val notification = NotificationGroupManager.getInstance()
-            .getNotificationGroup("visualboost.notification")
-            .createNotification(title, msg, type)
-            .setIcon(icon)
-
-        actions.forEach { notification.addAction(it) }
-
-        notification.notify(project)
-    }
-
     fun triggerSynchronization(fileName: String, fileContent: String) {
-        val settings = VbPluginSettingsState.getInstance()
-        val vbProjectId = settings.projectId
+        val settings = appSettings
+        val vbProjectId = projectSettings.projectId
 
         /**
          * Avoid Synchronization if projectId is empty
          */
-        if (vbProjectId.isBlank()) {
-            showError(
-                project,
+        if (vbProjectId.isNullOrBlank()) {
+            project.showError(
                 "Error",
                 "No projectId is defined in VisualBoost-Settings. Please provide the id of your VisualBoost-Project to enable Synchronization.",
                 actions = listOf(OpenSettingsAction())
@@ -414,9 +521,9 @@ class VbWindow(val project: Project) {
             }
                 """.trimIndent()
 
-        webView.cefBrowser.executeJavaScript(
+        jcefBrowser.cefBrowser.executeJavaScript(
             triggerSyncQuery,
-            webView.cefBrowser.url, 0
+            jcefBrowser.cefBrowser.url, 0
         )
     }
 }

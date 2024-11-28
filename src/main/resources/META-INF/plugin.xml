@@ -23,12 +23,12 @@
     </description>
 
     <change-notes><![CDATA[
-        <h2>Added: Ignore functionality</h2>
+        <h3>Added: Ignore functionality</h2>
         <ul>
             <li>Simply right click a file and select <b>Add to .vbignore</b> to add it to the <code>.vbignore</code> file</li>
-            <li>Right click inside the <code>.vbignore</code> and select <b>VisualBoost > push .vbignore</b> to push the adapted file to your origin.</li>
+            <li>Right click inside the <code>.vbignore</code> and select <b>VisualBoost > Push .vbignore</b> to push the adapted file to your origin.</li>
         </ul>
-        <h2>Display service unavailable</h2>
+        <h3>Display service unavailable</h2>
         <ul>
             <li>Displays a default html view if VisualBoost is not available</li>
         </ul>

@@ -12,7 +12,7 @@ plugins {
 }
 
 group = "visualboost.intellij"
-version = "1.0.0-alpha.03"
+version = "1.0.0-alpha.04"
 
 repositories {
     mavenCentral()

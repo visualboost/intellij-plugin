@@ -6,8 +6,6 @@ import com.intellij.openapi.components.Service
 import com.intellij.openapi.components.State
 import com.intellij.openapi.components.Storage
 import com.intellij.util.xmlb.XmlSerializerUtil
-import visualboost.plugin.models.GenerationTarget
-import visualboost.plugin.util.CredentialUtil
 
 @Service(Service.Level.APP)
 @State(
@@ -21,6 +19,7 @@ class VbAppSettings: PersistentStateComponent<VbAppSettings> {
     var useDefaultUrl: Boolean = true
     var defaultUrl: String = ""
     var mainUrl: String = ""
+    var buildUrl: String = ""
     var authUrl: String = ""
 
     var showIntroductionDialog: Boolean = true
@@ -38,4 +37,10 @@ class VbAppSettings: PersistentStateComponent<VbAppSettings> {
     override fun loadState(state: VbAppSettings) {
         XmlSerializerUtil.copyBean(state, this)
     }
+
+    fun useCustomUrlIsSelected(): Boolean{
+        return !useDefaultUrl
+    }
+
+
 }

@@ -1,15 +1,14 @@
 package visualboost.plugin.components
 
+import addTextChangeListener
 import com.intellij.icons.AllIcons
-import com.intellij.openapi.observable.util.whenTextChanged
-import com.intellij.openapi.vcs.changes.ui.LocalChangesBrowser.AllChanges
 import com.intellij.ui.AnimatedIcon
 import com.intellij.ui.components.JBLabel
 import com.intellij.ui.components.JBPasswordField
 import com.intellij.ui.components.JBTextField
 import com.intellij.ui.dsl.builder.panel
 import com.intellij.util.ui.FormBuilder
-import com.intellij.util.ui.UIUtil
+import visualboost.plugin.api.API
 import java.awt.*
 import javax.swing.*
 
@@ -37,21 +36,20 @@ class LoginComponent : JPanel() {
         initButtonSection()
         initErrorLabel()
 
-        emailTextField.whenTextChanged {
+        emailTextField.addTextChangeListener {
             onEmailChanged?.invoke(getEmail())
         }
 
-        passwordTextfield.whenTextChanged {
+        passwordTextfield.addTextChangeListener {
             onPasswordChanged?.invoke(getPassword())
         }
-
 
         val infoLabelPanel = JPanel(FlowLayout(FlowLayout.RIGHT))
         (infoLabelPanel.layout as FlowLayout).vgap = 0
         val infoLabel = panel {
             row {
                 comment(
-                    """<p>No VisualBoost account yet? <a href="https://app.visualboost.de">Click here</a> to create an new one.</p>""".trimIndent()
+                    """<p>No VisualBoost account yet? <a href="${API.getAppUrl()}">Click here</a> to create an new one.</p>""".trimIndent()
                 )
             }
         }

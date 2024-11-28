@@ -4,6 +4,7 @@ import com.google.gson.Gson
 import com.google.gson.reflect.TypeToken
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.future.await
+import visualboost.plugin.Logger
 import visualboost.plugin.api.models.AllProjectsResponseBody
 import visualboost.plugin.api.models.exception.HttpError
 import visualboost.plugin.api.models.LoginResponseBody
@@ -15,6 +16,7 @@ import visualboost.plugin.api.models.exception.HttpException
 import visualboost.plugin.api.models.intellij.project.github.GithubRepository
 import visualboost.plugin.api.models.model.AllModelsResponseBody
 import visualboost.plugin.api.models.plan.Plan
+import visualboost.plugin.api.models.project.AuthenticationServiceConfigResponseBody
 import visualboost.plugin.api.models.project.ConnectedGitRepositoryResponseBody
 import visualboost.plugin.api.models.project.git.GitRepositoryType
 import visualboost.plugin.api.models.project.ProjectConfigResponseBody
@@ -23,10 +25,14 @@ import visualboost.plugin.api.models.user.ActivationState
 import visualboost.plugin.models.GSON
 import visualboost.plugin.settings.VbAppSettings
 import visualboost.plugin.util.CredentialUtil
+import java.net.ConnectException
 import java.net.URI
 import java.net.http.HttpClient
 import java.net.http.HttpRequest
 import java.net.http.HttpResponse
+import java.net.http.HttpTimeoutException
+import java.time.Duration
+import java.util.concurrent.CompletableFuture
 
 object API {
 
@@ -36,6 +42,8 @@ object API {
     const val DEFAULT_AUTH_PATH = "/auth"
     const val DEFAULT_MAIN_PATH = "/main"
     const val DEFAULT_BUILD_PATH = "/build"
+
+    val logger = Logger().enableConsole(true).useDefaultLogFile()
 
     fun getAppUrl(): String {
         val settings = VbAppSettings.getInstance()
@@ -54,8 +62,7 @@ object API {
 
     fun getBuildUrl(): String {
         val settings = VbAppSettings.getInstance()
-        //TODO: add build url to settings
-        return if (settings.useDefaultUrl) (DEFAULT_URL + DEFAULT_BUILD_PATH) else throw NotImplementedError("Custom BUILD url isn't supported yet")
+        return if (settings.useDefaultUrl) (DEFAULT_URL + DEFAULT_BUILD_PATH) else settings.buildUrl
     }
 
     fun getPlanUrl(tenantId: String): String {
@@ -74,17 +81,29 @@ object API {
         return "${getAuthUrl()}/github/auth/$userId"
     }
 
+    private suspend fun executeRequest(request: HttpRequest): HttpResponse<String> {
+        try{
+            val client = HttpClient.newBuilder().connectTimeout(Duration.ofSeconds(30)).build()
+            return client.sendAsync(request, HttpResponse.BodyHandlers.ofString()).await()
+        }catch (e: Exception){
+            if(e is ConnectException || e is HttpTimeoutException){
+                logger.error("Connection failed: ${request.uri()}", API::class.java)
+                logger.error(e)
+
+                throw ConnectException("Connection failed: ${request.uri().toString()}")
+            }
+            throw e
+        }
+    }
 
     suspend fun login(email: String, password: String): LoginResponseBody {
-        val client = HttpClient.newBuilder().build()
         val request = HttpRequest.newBuilder()
             .uri(URI.create(getAuthUrl() + "/login?email=$email&password=$password"))
             .header("Content-Type", "application/x-www-form-urlencoded")
             .POST(HttpRequest.BodyPublishers.ofString(""))
             .build()
 
-        val sendRequest = client.sendAsync(request, HttpResponse.BodyHandlers.ofString())
-        val response = sendRequest.await()
+        val response = executeRequest(request)
 
         val status = response.statusCode()
         val body = response.body()
@@ -121,6 +140,28 @@ object API {
         val resp = Gson().fromJson<AllProjectsResponseBody>(jsonResponse, type)
 
         return resp.data.allProjects
+    }
+
+    suspend fun getAuthenticationServiceConfig(projectId: String): AuthenticationServiceConfigResponseBody.Data.AuthenticationServiceConfig {
+        val token = fetchToken()
+
+        val query = "query getAuthenticationServiceConfig (${'$'}projectId: ID!) { getAuthenticationServiceConfig (projectId: ${'$'}projectId) { isEnabled roles { name functions { _id name } } } }"
+        val body = """{"query": "$query", "variables": {"projectId": "$projectId"}}"""
+        val client = HttpClient.newBuilder().build()
+        val request = HttpRequest.newBuilder()
+            .uri(URI.create(getMainUrl()))
+            .header("Content-Type", "application/json")
+            .header("Authorization", "Bearer $token")
+            .POST(HttpRequest.BodyPublishers.ofString(body))
+            .build()
+
+        val response = client.sendAsync(request, HttpResponse.BodyHandlers.ofString())
+        val jsonResponse = response.await().body()
+
+        val type = object : TypeToken<AuthenticationServiceConfigResponseBody>() {}.type
+        val resp = Gson().fromJson<AuthenticationServiceConfigResponseBody>(jsonResponse, type)
+
+        return resp.data.getAuthenticationServiceConfig
     }
 
     suspend fun getPlan(jwt: String, tenantId: String): Plan {

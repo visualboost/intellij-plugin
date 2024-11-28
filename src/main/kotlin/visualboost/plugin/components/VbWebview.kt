@@ -1,11 +1,10 @@
 package visualboost.plugin.components
 
 import com.intellij.openapi.Disposable
-import com.intellij.openapi.application.ApplicationManager
 import com.intellij.openapi.util.Disposer
 import com.intellij.ui.jcef.JBCefBrowser
 
-class VbWebview(val parentDisposeable: Disposable): Disposable {
+class VbWebview(parentDisposeable: Disposable): Disposable {
 
     val browser: JBCefBrowser
 
@@ -19,7 +18,6 @@ class VbWebview(val parentDisposeable: Disposable): Disposable {
         browser.jbCefClient.dispose()
         browser.dispose()
         browser.cefBrowser.close(true)
-
     }
 
 

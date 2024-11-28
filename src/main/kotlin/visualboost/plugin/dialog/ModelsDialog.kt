@@ -1,6 +1,5 @@
 package visualboost.plugin.dialog
 
-import com.intellij.openapi.observable.util.whenItemSelected
 import com.intellij.openapi.project.Project
 import com.intellij.openapi.ui.ComboBox
 import com.intellij.openapi.ui.DialogWrapper
@@ -8,7 +7,6 @@ import com.intellij.ui.AnimatedIcon
 import kotlinx.coroutines.*
 import visualboost.plugin.api.API
 import visualboost.plugin.api.models.model.AllModelsResponseBody
-import visualboost.plugin.settings.VbAppSettings
 import visualboost.plugin.settings.VbProjectSettings
 import java.awt.BorderLayout
 import javax.swing.JComponent
@@ -70,7 +68,7 @@ class ModelsDialog(val project: Project, val jwt: String) : DialogWrapper(true),
         dialogPanel.add(loadingLabel)
         dialogPanel.add(comboBox, BorderLayout.CENTER)
 
-        comboBox.whenItemSelected<String> {
+        comboBox.addActionListener {
             selectedModel = models[comboBox.selectedIndex]
         }
 

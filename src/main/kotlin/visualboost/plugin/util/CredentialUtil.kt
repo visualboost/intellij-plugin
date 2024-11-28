@@ -1,8 +1,8 @@
 package visualboost.plugin.util
 
+import com.intellij.credentialStore.CredentialAttributes
 import com.intellij.credentialStore.Credentials
 import com.intellij.ide.passwordSafe.PasswordSafe
-import com.intellij.remoteServer.util.CloudConfigurationUtil.createCredentialAttributes
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
 import visualboost.plugin.api.models.LoginRequestBody
@@ -15,9 +15,9 @@ object CredentialUtil {
     const val GITHUB_ACCESSTOKEN = "GITHUB_ACCESSTOKEN"
 
     fun storeCredentials(key: String, password: String) {
-        val attributes = createCredentialAttributes(VISUALBOOST, key)
+        val attributes = createCredentialAttributes(key)
         val credentials = Credentials(key, password)
-        PasswordSafe.instance.set(attributes!!, credentials)
+        PasswordSafe.instance.set(attributes, credentials)
     }
 
     fun storeVisualBoostCredentials(username: String, password: String) {
@@ -27,14 +27,14 @@ object CredentialUtil {
 
     suspend fun clearCredentials() {
         val username = getVBCredentials()?.email ?: return
-        val attributes = createCredentialAttributes(VISUALBOOST, username)
+        val attributes = createCredentialAttributes(username)
 
         VbAppSettings.getInstance().username = null
-        PasswordSafe.instance.set(attributes!!, null)
+        PasswordSafe.instance.set(attributes, null)
     }
 
     suspend fun getCredentials(key: String): String? {
-        val attributes = createCredentialAttributes(VISUALBOOST, key) ?: return null
+        val attributes = createCredentialAttributes(key)
         val passwordSafe = PasswordSafe.instance
 
         val credentials = withContext(Dispatchers.IO){
@@ -66,5 +66,9 @@ object CredentialUtil {
 
     fun getUsername(): String? {
         return VbAppSettings.getInstance().username
+    }
+
+    private fun createCredentialAttributes(username: String): CredentialAttributes {
+        return CredentialAttributes(VISUALBOOST, username)
     }
 }

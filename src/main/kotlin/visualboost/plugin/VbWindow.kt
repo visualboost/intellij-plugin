@@ -3,10 +3,6 @@ package visualboost.plugin
 import com.google.gson.reflect.TypeToken
 import com.intellij.openapi.Disposable
 import com.intellij.openapi.options.ShowSettingsUtil
-import com.intellij.openapi.progress.ProgressIndicator
-import com.intellij.openapi.progress.ProgressManager
-import com.intellij.openapi.progress.Task
-import com.intellij.openapi.progress.util.ProgressWindow
 import com.intellij.openapi.project.Project
 import com.intellij.openapi.roots.ProjectRootManager
 import com.intellij.openapi.util.Disposer
@@ -32,15 +28,19 @@ import visualboost.plugin.components.VbWebview
 import visualboost.plugin.events.GlobalEvents
 import visualboost.plugin.models.GSON
 import visualboost.plugin.models.GenerationProcess
-import visualboost.plugin.settings.VbPluginSettingsConfigurable
 import visualboost.plugin.settings.VbAppSettings
+import visualboost.plugin.settings.VbPluginSettingsConfigurable
 import visualboost.plugin.settings.VbProjectSettings
-import visualboost.plugin.util.*
+import visualboost.plugin.tasks.impl.pull.queue.PullAfterBuildQueue
+import visualboost.plugin.util.CredentialUtil
+import visualboost.plugin.util.EnvWriter
+import visualboost.plugin.util.showError
 import java.awt.BorderLayout
 import java.awt.GridBagConstraints
 import java.awt.GridBagLayout
 import java.awt.Insets
 import java.io.File
+import java.net.URI
 import java.net.URLEncoder
 import javax.swing.JButton
 import javax.swing.JComponent
@@ -65,7 +65,7 @@ class VbWindow(val project: Project) : CoroutineScope {
         content.layout = BorderLayout()
     }
 
-    fun initBrowser(disposable: Disposable){
+    fun initBrowser(disposable: Disposable) {
         vbBrowser = VbWebview(disposable)
         jcefBrowser = vbBrowser.browser
         jsQuery = JBCefJSQuery.create((jcefBrowser as JBCefBrowserBase))
@@ -75,6 +75,7 @@ class VbWindow(val project: Project) : CoroutineScope {
         }
 
         displayWindowContent(appSettings)
+        vbBrowser.browser.setErrorPage { code, s, s2 -> "<p>hallo</p>" }
     }
 
     private fun displayWindowContent(settings: VbAppSettings) {
@@ -120,28 +121,39 @@ class VbWindow(val project: Project) : CoroutineScope {
 
     fun loadAndDisplayProject(projectId: String) {
         launch {
-            val token = withContext(Dispatchers.IO) {
-                API.fetchToken()
-            } ?: return@launch
+            try {
+                val token = withContext(Dispatchers.IO) {
+                    API.fetchToken()
+                } ?: return@launch
 
-            //set jwt as session token
-            setJwtCookie(token)
+                //set jwt as session token
+                setJwtCookie(token)
 
-            val jwtContent = JwtContent.fromJwt(token)
-            val plan = withContext(Dispatchers.IO) {
-                API.getPlan(token, jwtContent.tenantId)
+                val jwtContent = JwtContent.fromJwt(token)
+                val plan = withContext(Dispatchers.IO) {
+                    API.getPlan(token, jwtContent.tenantId)
+                }
+                setPlanCookie(plan)
+
+                val userState = withContext(Dispatchers.IO) {
+                    API.getUserState(token, jwtContent.userId)
+                }
+                setUserActivationState(userState)
+
+                val vbUrl = API.getProjectUrl(projectId)
+                jcefBrowser.loadURL(vbUrl)
+                content.updateUI()
+
+            } catch (e: Exception) {
+                displayServiceIsNotAvailable()
+                project.showError("Error", e.message ?: e.stackTraceToString())
             }
-            setPlanCookie(plan)
-
-            val userState = withContext(Dispatchers.IO) {
-                API.getUserState(token, jwtContent.userId)
-            }
-            setUserActivationState(userState)
-
-            val vbUrl = API.getProjectUrl(projectId)
-            jcefBrowser.loadURL(vbUrl)
-            content.updateUI()
         }
+    }
+
+    private fun displayServiceIsNotAvailable() {
+        val serviceUnavailableHtml = VbWindow::class.java.getResource("/html/service_not_available.html")?.readText() ?: return
+        jcefBrowser.loadHTML(serviceUnavailableHtml)
     }
 
 
@@ -219,6 +231,7 @@ class VbWindow(val project: Project) : CoroutineScope {
                 errorText: String?,
                 failedUrl: String?
             ) {
+                displayServiceIsNotAvailable()
             }
 
         }, jcefBrowser.cefBrowser)
@@ -231,25 +244,26 @@ class VbWindow(val project: Project) : CoroutineScope {
         ).get()
     }
 
-    private fun setPlanCookie(plan: Plan) {
-        val urlEncodedPlan = URLEncoder.encode(plan.toJsonString(), "utf-8")
-        val planCookie = jcefBrowser.jbCefCookieManager.setCookie(
-            API.getAppUrl(),
-            JBCefCookie(
-                "plan",
-                urlEncodedPlan,
-                API.DOMAIN,
-                "/",
-                true,
-                false
-            )
-        ).get()
+    /**
+     * set authentication cookie
+     */
+    private fun setJwtCookie(token: String) {
+        setCookie("jwt", token)
     }
 
-    private fun setJwtCookie(token: String) {
+    private fun setPlanCookie(plan: Plan) {
+        val urlEncodedPlan = URLEncoder.encode(plan.toJsonString(), "utf-8")
+        setCookie("plan", urlEncodedPlan)
+    }
+
+    private fun setCookie(key: String, value: String) {
+        val appUrl = URI(API.getAppUrl()).toURL()
+        val secure = appUrl.protocol == "https"
+        val host = appUrl.host
+
         jcefBrowser.jbCefCookieManager.setCookie(
-            API.getAppUrl(),
-            JBCefCookie("jwt", token, API.DOMAIN, "/", true, false)
+            appUrl.toString(),
+            JBCefCookie(key, value, host, "/", secure, false)
         ).get()
     }
 
@@ -293,65 +307,35 @@ class VbWindow(val project: Project) : CoroutineScope {
 
     private fun initEventListener(project: Project) {
         jsQuery.addHandler { result: String ->
-
-            val generationProcesses = getGenerationProcess(result)
-
-            val target = projectSettings.target
-            if (target == null) {
-                project.showError("Error", "No target configured for project. Skip pull repository.")
-                return@addHandler null
-            }
-
-            /**
-             * Validate if the current project is has the right target.
-             * Example: If The user generated client code but the current intellij project is defined as backend project, we do not want to trigger a git pull.
-             */
-            val process = generationProcesses.find { it.target == target } ?: return@addHandler null
-
-            /**
-             * Check if set project is same as the current VB-Project
-             */
-            val settingsProjectId = projectSettings.projectId
-            if (settingsProjectId != process.projectId) {
-                return@addHandler null
-            }
-
-            pullAsync(process)
+            pullNewVbVersion(result)
             null
         }
     }
 
-    private fun pullAsync(process: GenerationProcess) {
-        val backgroundTask = object : Task.Backgroundable(project, "Pull data", true) {
-            override fun run(indicator: ProgressIndicator) {
-                indicator.text = "Pull version ${process.version}"
-                try {
-                    val currentBranch = getCurrentBranch(project)
-                    if (currentBranch == process.branch) {
-                        pull(project, process.branch)
-                        refreshSourceDir()
+    private fun pullNewVbVersion(result: String) {
+        val generationProcesses = getGenerationProcess(result)
 
-                        project.showInfo(
-                            "Updated",
-                            "Successfully pulled Version ${process.version} from VisualBoost (Branch: ${process.branch}"
-                        )
-                    } else {
-                        fetch(project, process.branch)
-                        project.showInfo(
-                            "Updated",
-                            "Successfully fetched Version ${process.version} from VisualBoost. Checkout the branch ${process.branch} to access your changes"
-                        )
-                    }
-
-                } catch (e: Exception) {
-                    project.showError("Error", e.message ?: "")
-                }
-            }
+        val target = projectSettings.target
+        if (target == null) {
+            project.showError("Error", "No target configured for project. Skip pull repository.")
+            return
         }
 
-        val progressWindow = ProgressWindow(false, true, project)
-        ProgressManager.getInstance().runProcessWithProgressAsynchronously(backgroundTask, progressWindow)
+        /**
+         * Validate if the current project has the right target.
+         * Example: If The user generated client code but the current intellij project is defined as backend project, we do not want to trigger a git pull.
+         */
+        val process = generationProcesses.find { it.target == target } ?: return
 
+        /**
+         * Check if set project is same as the current VB-Project
+         */
+        val settingsProjectId = projectSettings.projectId
+        if (settingsProjectId != process.projectId) {
+            return
+        }
+
+        PullAfterBuildQueue(project, process.version, process.branch).execute()
     }
 
     /**
@@ -477,19 +461,7 @@ class VbWindow(val project: Project) : CoroutineScope {
 
     fun getGenerationProcess(processesAsJson: String): List<GenerationProcess> {
         val listType = object : TypeToken<List<GenerationProcess>>() {}.getType()
-        return GSON.gson.fromJson<List<GenerationProcess>>(processesAsJson, listType)
-    }
-
-    fun fetch(project: Project, branch: String) {
-        "git fetch origin $branch:$branch".runCommand(project)
-    }
-
-    fun pull(project: Project, branch: String) {
-        "git pull origin $branch:$branch".runCommand(project)
-    }
-
-    fun getCurrentBranch(project: Project): String {
-        return "git branch --show-current".runCommand(project).replace("\n", "")
+        return GSON.gson.fromJson(processesAsJson, listType)
     }
 
     fun triggerSynchronization(fileName: String, fileContent: String) {
@@ -526,4 +498,6 @@ class VbWindow(val project: Project) : CoroutineScope {
             jcefBrowser.cefBrowser.url, 0
         )
     }
+
+
 }

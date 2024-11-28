@@ -1,9 +1,8 @@
 package visualboost.plugin.components
 
+import addTextChangeListener
 import com.intellij.icons.AllIcons
 import com.intellij.ide.HelpTooltip
-import com.intellij.openapi.observable.util.whenItemSelected
-import com.intellij.openapi.observable.util.whenTextChanged
 import com.intellij.openapi.ui.ComboBox
 import com.intellij.ui.TitledSeparator
 import com.intellij.ui.components.JBTabbedPane
@@ -45,11 +44,6 @@ class GithubComponent(val vbProjectGenerationSettings: VBProjectGenerationSettin
 
     init {
         layout = GridBagLayout()
-
-        val panel = FormBuilder.createFormBuilder()
-            .addComponent(initGithubPanel())
-            .panel
-
         initChildComponent(initGithubPanel())
     }
 
@@ -98,10 +92,9 @@ class GithubComponent(val vbProjectGenerationSettings: VBProjectGenerationSettin
             )
             .panel
 
-        backendRepoNameTextField.whenTextChanged {
-            onRepositoryNamesChanged?.invoke(
-                if (backendRepoNameTextField.text.isNullOrBlank()) null else backendRepoNameTextField.text
-            )
+
+        backendRepoNameTextField.addTextChangeListener {
+            onRepositoryNamesChanged?.invoke(if (it.isBlank()) null else it)
         }
 
         tabbedPane.addTab(title, createRepositoryName)
@@ -119,9 +112,8 @@ class GithubComponent(val vbProjectGenerationSettings: VBProjectGenerationSettin
             )
             .panel
 
-        backendRepoUrlCombobox.whenItemSelected {
+        backendRepoUrlCombobox.addActionListener {
             val selectedRepo = repositories[backendRepoUrlCombobox.selectedIndex]
-
             onRepositoryUrlChanged?.invoke(if (selectedRepo.url == null) null else selectedRepo)
         }
 

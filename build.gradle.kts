@@ -6,12 +6,13 @@ plugins {
     id("org.jetbrains.kotlin.jvm") version "1.9.23"
 //    id("org.jetbrains.intellij") version "1.17.4"
 
-    id("org.jetbrains.intellij.platform") version "2.0.0"
+    id("org.jetbrains.intellij.platform") version "2.1.0"
     id("org.jetbrains.intellij.platform.migration") version "2.0.0"
+
 }
 
 group = "visualboost.intellij"
-version = "1.0.0-alpha.01"
+version = "1.0.0-alpha.03"
 
 repositories {
     mavenCentral()
@@ -51,10 +52,8 @@ repositories {
 
 intellijPlatform {
     pluginConfiguration {
-//        version.set("2022.3.3")
         name.set("VisualBoost")
     }
-
 }
 
 
@@ -71,16 +70,16 @@ configurations.all {
 tasks {
     // Set the JVM compatibility versions
     withType<JavaCompile> {
-        sourceCompatibility = "17"
-        targetCompatibility = "17"
+        sourceCompatibility = "20"
+        targetCompatibility = "20"
     }
     withType<org.jetbrains.kotlin.gradle.tasks.KotlinCompile> {
-        kotlinOptions.jvmTarget = "17"
+        kotlinOptions.jvmTarget = "20"
     }
 
     patchPluginXml {
-        sinceBuild.set("213")
-        untilBuild.set("241.*")
+        sinceBuild.set("233")
+        untilBuild.set("243.*")
     }
 
     signPlugin {
@@ -105,15 +104,10 @@ dependencies {
     implementation("com.google.code.gson:gson:2.10.1")
     implementation("org.slf4j:slf4j-api:1.7.25")
 
-//    implementation("visualboost:codegen_base-lib:0.1.46")
-
     intellijPlatform {
         jetbrainsRuntime()
 
-//        intellijIdeaCommunity("2024.1.2")
-//        bundledPlugins("Git4Idea")
-
-        webstorm("2024.1.2")
+        webstorm("2024.3")
         bundledPlugins("Git4Idea", "JavaScript", "Docker")
 
         pluginVerifier()

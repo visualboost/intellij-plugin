@@ -22,10 +22,25 @@
         process and amplify productivity with VisualBoost!
     </description>
 
+    <change-notes><![CDATA[
+        <h2>Added: Ignore functionality</h2>
+        <ul>
+            <li>Simply right click a file and select <b>Add to .vbignore</b> to add it to the <code>.vbignore</code> file</li>
+            <li>Right click inside the <code>.vbignore</code> and select <b>VisualBoost > push .vbignore</b> to push the adapted file to your origin.</li>
+        </ul>
+        <h2>Display service unavailable</h2>
+        <ul>
+            <li>Displays a default html view if VisualBoost is not available</li>
+        </ul>
+    ]]></change-notes>
+
+    <idea-version since-build="WS-231.*" until-build="WS-243.*"/>
+
     <!-- Product and plugin compatibility requirements.
          Read more: https://plugins.jetbrains.com/docs/intellij/plugin-compatibility.html -->
     <depends>com.intellij.modules.platform</depends>
-    <depends>com.intellij.modules.javascript</depends>
+<!--    <depends>com.intellij.modules.javascript</depends>-->
+    <depends>JavaScript</depends>
     <depends>Git4Idea</depends>
     <depends>Docker</depends>
 
@@ -37,7 +52,7 @@
         <projectService id="VbWindowService" serviceImplementation="visualboost.plugin.VbWindowService"/>
 
         <notificationGroup id="visualboost.notification" displayType="BALLOON" key="visualboost.error.title"
-                           order="first" os="windows" bundle="i18n" icon="AllIcons.Actions.Install"/>
+                           order="first" bundle="i18n" icon="AllIcons.Actions.Install"/>
 
         <!-- Settings -->
         <applicationService
@@ -71,18 +86,35 @@
     </extensions>
 
     <actions>
+
+
         <group
                 id="visualboost.plugin.action_group.EditorContextMenu"
                 text="VisualBoost"
                 icon="/icons/logo_15x15.png"
+                popup="true"
         >
             <add-to-group group-id="EditorPopupMenu" anchor="last"/>
             <separator/>
-            <action id="visualboost.plugin.editor.contextmenu.actions.SyncAction" class="visualboost.plugin.actions.SyncAction"
+
+            <action id="visualboost.plugin.editor.contextmenu.actions.SyncAction"
+                    class="visualboost.plugin.actions.SyncAction"
                     text="Synchronize Extension"
-                    description="Synchronize your custom business logic with VisualBoost"
-                    icon="/icons/logo_15x15.png">
+                    description="Synchronize your custom business logic with VisualBoost">
             </action>
+
+            <action id="visualboost.plugin.actions.LoadProjectConfigurationAction"
+                    class="visualboost.plugin.actions.LoadProjectConfigurationAction"
+                    text="Update Configuration"
+                    description="Fetch and set the project configuration. Can be necessary after changing the extension directory in VisualBoost."
+            />
+
+            <action id="visualboost.plugin.actions.CommitAndPushVbIgnoreAction"
+                    class="visualboost.plugin.actions.CommitAndPushVbIgnoreAction"
+                    text="Push .vbignore"
+                    description="Stage, commit and push the .vbignore to make the changes take effect."
+            />
+
         </group>
 
 
@@ -109,17 +141,12 @@
         <group
                 id="visualboost.plugin.action_group.ProjectContextMenu"
                 text="VisualBoost"
-                popup="true"
                 icon="/icons/logo_15x15.png"
         >
             <add-to-group group-id="ProjectViewPopupMenu" anchor="last"/>
-
-            <separator/>
-
-            <action id="visualboost.plugin.actions.InitProjectAction"
-                    class="visualboost.plugin.actions.InitProjectAction"
-                    text="Init Project"
-                    icon="AllIcons.General.GearPlain">
+            <action id="visualboost.plugin.actions.AddFileToVbIgnoreAction"
+                    class="visualboost.plugin.actions.AddFileToVbIgnoreAction" text="Add to .vbignore"
+                    description="Add file to .vbignore">
             </action>
         </group>
 
@@ -149,16 +176,12 @@
         <action id="visualboost.plugin.actions.OpenDockerPluginWebsiteAction"
                 class="visualboost.plugin.actions.OpenDockerPluginWebsiteAction" text="Install Plugin"/>
 
-        <action id="visualboost.plugin.actions.LoadProjectConfigurationAction"
-                class="visualboost.plugin.actions.LoadProjectConfigurationAction" text="Reload VisualBoost Configuration"/>
-
         <action id="visualboost.plugin.actions.ShowIntroductionDialogAction"
-                class="visualboost.plugin.actions.ShowIntroductionDialogAction" text="Show Introduction Dialog (VisualBoost)"/>
+                class="visualboost.plugin.actions.ShowIntroductionDialogAction" text="Show Introduction"/>
 
         <group id="visualboost.editor.floating_toolbar" class="visualboost.plugin.editor.VbEditorFloatingActionGroup">
             <action id="visualboost.plugin.editor.toolbar.actions.SyncAction" class="visualboost.plugin.actions.SyncAction" icon="AllIcons.Toolwindows.SettingSync" text="Synchronize Extension"/>
         </group>
-
     </actions>
 
 </idea-plugin>

@@ -15,8 +15,6 @@ class IntroductionDialog(val width: Int = 600) : DialogWrapper(true) {
     init {
         title = "Introduction"
 
-        addDoNotShowAgain()
-
         init()
 
         val cancelButton = getButton(cancelAction)
@@ -29,30 +27,30 @@ class IntroductionDialog(val width: Int = 600) : DialogWrapper(true) {
         peer.window.preferredSize = Dimension(width, -1)
     }
 
-    private fun addDoNotShowAgain() {
-        setDoNotAskOption(object : com.intellij.openapi.ui.DoNotAskOption {
-            override fun isToBeShown(): Boolean {
-                return VbAppSettings.getInstance().showIntroductionDialog
-            }
-
-            override fun setToBeShown(showIntroductionDialog: Boolean, p1: Int) {
-                VbAppSettings.getInstance().showIntroductionDialog = showIntroductionDialog
-            }
-
-            override fun canBeHidden(): Boolean {
-                return true
-            }
-
-            override fun shouldSaveOptionsOnCancel(): Boolean {
-                return true
-            }
-
-            override fun getDoNotShowMessage(): String {
-                return "Don't show again"
-            }
-
-        })
-    }
+//    private fun addDoNotShowAgain() {
+//        setDoNotAskOption(object : com.intellij.openapi.ui.DoNotAskOption {
+//            override fun isToBeShown(): Boolean {
+//                return VbAppSettings.getInstance().showIntroductionDialog
+//            }
+//
+//            override fun setToBeShown(showIntroductionDialog: Boolean, p1: Int) {
+//                VbAppSettings.getInstance().showIntroductionDialog = showIntroductionDialog
+//            }
+//
+//            override fun canBeHidden(): Boolean {
+//                return true
+//            }
+//
+//            override fun shouldSaveOptionsOnCancel(): Boolean {
+//                return true
+//            }
+//
+//            override fun getDoNotShowMessage(): String {
+//                return "Don't show again"
+//            }
+//
+//        })
+//    }
 
     override fun createCenterPanel(): JComponent {
         val panel = panel {

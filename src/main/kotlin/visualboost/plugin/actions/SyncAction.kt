@@ -12,8 +12,11 @@ import com.intellij.openapi.vfs.VirtualFile
 import com.intellij.openapi.vfs.findDocument
 import com.intellij.openapi.wm.ToolWindowManager
 import com.intellij.psi.PsiFile
+import isJavascriptFile
+import isVbExtension
 import kotlinx.coroutines.*
 import toFile
+import virtualFileFromAction
 import visualboost.plugin.VbWindowService
 import visualboost.plugin.editor.GlobalEditorToolbarHandler
 import visualboost.plugin.settings.VbProjectSettings
@@ -30,7 +33,7 @@ class SyncAction : AnAction(), CoroutineScope {
         val project = e.project ?: return
 
         launch {
-            val currentVirtualFile = getVirtualFileFromAction(e) ?: return@launch
+            val currentVirtualFile = virtualFileFromAction(e) ?: return@launch
             if (!fileIsExtension(project, currentVirtualFile)) return@launch
 
             saveFile(currentVirtualFile)
@@ -58,38 +61,33 @@ class SyncAction : AnAction(), CoroutineScope {
     }
 
     private fun fileIsExtension(project: Project, vFile: VirtualFile): Boolean {
-        val extensionDirPath = VbProjectSettings.getInstance(project).extensionDirectory ?: return false
+        val extensionDirPath = VbProjectSettings.getInstance(project).extensionDirPath ?: return false
         val extensionDir = ProjectDirectories.getExtensionDir(project, extensionDirPath) ?: return false
         val currentFile = vFile.toFile()
         return currentFile.absolutePath.contains(extensionDir.absolutePath)
     }
 
     override fun update(e: AnActionEvent) {
-        launch {
-            val project = e.project ?: return@launch
+        val project = e.project ?: return
 
-            val vFile = getVirtualFileFromAction(e) ?: return@launch
-            val extension = vFile.extension
-
-            val isJavascriptFile = extension == "js"
-            if (!isJavascriptFile) {
-                e.presentation.isVisible = false
-                return@launch
-            }
-
-            e.presentation.isVisible = fileIsExtension(project, vFile)
+        val vFile = virtualFileFromAction(e) ?: return
+        if (!vFile.isJavascriptFile() || !vFile.isVbExtension(project)) {
+            e.presentation.isEnabled = false
+            return
         }
+
+        e.presentation.isEnabled = true
     }
 
-    fun getVirtualFileFromAction(e: AnActionEvent): VirtualFile? {
-        return runReadAction {
-            val selectedElement: PsiFile = e.getData(CommonDataKeys.PSI_FILE) ?: return@runReadAction null
-            return@runReadAction selectedElement.originalFile.virtualFile
-        }
-    }
+//    fun getVirtualFileFromAction(e: AnActionEvent): VirtualFile? {
+//        return runReadAction {
+//            val selectedElement: PsiFile = e.getData(CommonDataKeys.PSI_FILE) ?: return@runReadAction null
+//            return@runReadAction selectedElement.originalFile.virtualFile
+//        }
+//    }
 
-    private suspend fun saveFile(vFile: VirtualFile){
-        withContext(Dispatchers.EDT){
+    private suspend fun saveFile(vFile: VirtualFile) {
+        withContext(Dispatchers.EDT) {
             val document = vFile.findDocument() ?: return@withContext
             FileDocumentManager.getInstance().saveDocument(document)
         }

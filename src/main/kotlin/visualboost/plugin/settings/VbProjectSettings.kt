@@ -7,7 +7,7 @@ import com.intellij.openapi.components.Storage
 import com.intellij.openapi.project.Project
 import com.intellij.util.xmlb.XmlSerializerUtil
 import visualboost.plugin.models.GenerationTarget
-import visualboost.plugin.util.CredentialUtil
+import java.io.File
 
 @State(
     name = "visualboost.intellij.settings.VbProjectSettings",
@@ -18,7 +18,7 @@ class VbProjectSettings: PersistentStateComponent<VbProjectSettings> {
 
     var target: GenerationTarget? = null
     var projectId: String? = null
-    var extensionDirectory : String? = null
+    var extensionDirPath : String? = null
     var zoomLevel: Double = 0.8
 
     companion object {

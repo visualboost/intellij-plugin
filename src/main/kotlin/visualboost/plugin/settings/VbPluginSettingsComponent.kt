@@ -1,17 +1,25 @@
 package visualboost.plugin.settings
 
 import com.intellij.icons.AllIcons
+import com.intellij.ide.HelpTooltip
 import com.intellij.openapi.application.EDT
+import com.intellij.openapi.observable.util.whenTextChanged
 import com.intellij.openapi.project.Project
+import com.intellij.ui.GotItTooltip
 import com.intellij.ui.components.JBCheckBox
 import com.intellij.ui.components.JBLabel
 import com.intellij.ui.components.JBRadioButton
 import com.intellij.ui.components.JBTextField
-import com.intellij.ui.dsl.builder.impl.CollapsibleTitledSeparatorImpl
+import com.intellij.ui.dsl.builder.Align
+import com.intellij.ui.dsl.builder.panel
+import com.intellij.ui.dsl.builder.selected
+import com.intellij.ui.dsl.builder.text
 import com.intellij.util.io.URLUtil
 import com.intellij.util.ui.FormBuilder
 import com.intellij.util.ui.UIUtil
+import io.ktor.http.*
 import kotlinx.coroutines.*
+import org.assertj.swing.util.Patterns
 import org.jdesktop.swingx.HorizontalLayout
 import visualboost.plugin.api.API
 import visualboost.plugin.api.models.AllProjectsResponseBody
@@ -19,7 +27,11 @@ import visualboost.plugin.components.LoginComponent
 import visualboost.plugin.components.SelectProjectDropdownComponent
 import visualboost.plugin.models.GenerationTarget
 import visualboost.plugin.util.CredentialUtil
+import visualboost.plugin.util.showError
+import visualboost.plugin.util.showWarning
 import java.awt.Font
+import java.net.URI
+import java.net.URL
 import javax.swing.*
 
 
@@ -41,10 +53,11 @@ class VbPluginSettingsComponent(val project: Project) : CoroutineScope {
 
     lateinit var projectSelectionPanel: SelectProjectDropdownComponent
 
-    private val defaultUrlTextField = JBTextField()
-    private val mainUrlTextField = JBTextField()
-    private val authUrlTextField = JBTextField()
-    val adaptUrlCheckbox = JBCheckBox("Connect to custom VisualBoost instance")
+    private var defaultUrlTextField = JBTextField()
+    private var mainUrlTextField = JBTextField()
+    private var buildUrlTextField = JBTextField()
+    private var authUrlTextField = JBTextField()
+    private var adaptUrlCheckbox = JBCheckBox()
 
     init {
         val projectIdDescription = JBLabel(
@@ -80,8 +93,6 @@ class VbPluginSettingsComponent(val project: Project) : CoroutineScope {
             .addComponent(advancedForm)
             .addComponentFillVertically(JPanel(), 0)
             .panel
-
-
     }
 
     private suspend fun login() {
@@ -94,6 +105,8 @@ class VbPluginSettingsComponent(val project: Project) : CoroutineScope {
 
             CredentialUtil.storeVisualBoostCredentials(getEmail(), getPassword())
             handleCredentialFormsVisibility()
+        } catch (e: Exception) {
+            project.showWarning("Login failed", "An error occurred during login attempt.")
         } finally {
             loginPanel.load(false)
         }
@@ -110,7 +123,12 @@ class VbPluginSettingsComponent(val project: Project) : CoroutineScope {
     }
 
     fun isUrlValid(url: String): Boolean {
-        return url.startsWith("http://") || url.startsWith("https://") && URLUtil.URL_PATTERN.matcher(url).matches()
+        return try {
+            val url = URI(url).toURL()
+            url.protocol.isNotEmpty() && url.host.isNotEmpty()
+        } catch (e: Exception){
+            false
+        }
     }
 
     fun setTarget(target: GenerationTarget?) {
@@ -170,12 +188,12 @@ class VbPluginSettingsComponent(val project: Project) : CoroutineScope {
         return loginPanel
     }
 
-    private suspend fun loadVbCredentials(){
-        val credentials = withContext(Dispatchers.IO){
+    private suspend fun loadVbCredentials() {
+        val credentials = withContext(Dispatchers.IO) {
             CredentialUtil.getVBCredentials() ?: return@withContext null
         } ?: return
 
-        withContext(Dispatchers.EDT){
+        withContext(Dispatchers.EDT) {
             loginPanel.setEmail(credentials.email)
             loginPanel.setPassword(credentials.password)
         }
@@ -212,7 +230,7 @@ class VbPluginSettingsComponent(val project: Project) : CoroutineScope {
         return logoutPanel
     }
 
-    private fun logout(){
+    private fun logout() {
         launch {
             CredentialUtil.clearCredentials()
             handleCredentialFormsVisibility()
@@ -234,55 +252,81 @@ class VbPluginSettingsComponent(val project: Project) : CoroutineScope {
     }
 
     private fun initAdvancedComponent(): JPanel {
-        val panel = JPanel()
-        panel.layout = BoxLayout(panel, BoxLayout.Y_AXIS)
-
-        val collapsibleTitledSeparator = CollapsibleTitledSeparatorImpl("Advanced")
-        collapsibleTitledSeparator.expanded = false
-
         val settings = appSettings
-        adaptUrlCheckbox.isSelected = !settings.useDefaultUrl
+        val panel = panel {
+            collapsibleGroup("Advanced") {
+                row {
+                    val icon = icon(AllIcons.General.Warning)
+                    HelpTooltip().setDescription("Url is invalid").installOn(icon.component)
+                    icon.visible(!isUrlValid(appSettings.defaultUrl))
 
-        defaultUrlTextField.text = settings.defaultUrl
-        mainUrlTextField.text = settings.mainUrl
-        authUrlTextField.text = settings.authUrl
+                    text("Domain (URL):           ")
+                    val textFieldCell = textField().align(Align.FILL)
+                    textFieldCell.text(appSettings.defaultUrl)
+                    textFieldCell.onChanged {
+                        val defaultUrlIsValid = isUrlValid(defaultUrlTextField.text)
+                        icon.visible(!defaultUrlIsValid)
+                    }
+
+                    defaultUrlTextField = textFieldCell.component
+                }
+                row {
+                    val icon = icon(AllIcons.General.Warning)
+                    HelpTooltip().setDescription("Url is invalid").installOn(icon.component)
+                    icon.visible(!isUrlValid(appSettings.authUrl))
+
+                    text("Auth-Service (URL):")
+                    val textFieldCell = textField().align(Align.FILL)
+                    textFieldCell.text(appSettings.authUrl)
+                    textFieldCell.onChanged {
+                        val defaultUrlIsValid = isUrlValid(authUrlTextField.text)
+                        icon.visible(!defaultUrlIsValid)
+                    }
+
+                    authUrlTextField = textFieldCell.component
+                }
+                row {
+                    val icon = icon(AllIcons.General.Warning)
+                    HelpTooltip().setDescription("Url is invalid").installOn(icon.component)
+                    icon.visible(!isUrlValid(appSettings.mainUrl))
+
+                    text("Main-Service (URL):")
+                    val textFieldCell = textField().align(Align.FILL)
+                    textFieldCell.text(appSettings.mainUrl)
+                    textFieldCell.onChanged {
+                        val defaultUrlIsValid = isUrlValid(mainUrlTextField.text)
+                        icon.visible(!defaultUrlIsValid)
+                    }
+
+                    mainUrlTextField = textFieldCell.component
+                }
+                row {
+                    val icon = icon(AllIcons.General.Warning)
+                    HelpTooltip().setDescription("Url is invalid").installOn(icon.component)
+                    icon.visible(!isUrlValid(appSettings.buildUrl))
+
+                    text("Build-Service (URL):")
+                    val textFieldCell = textField().align(Align.FILL)
+                    textFieldCell.text(appSettings.buildUrl)
+                    textFieldCell.onChanged {
+                        val defaultUrlIsValid = isUrlValid(buildUrlTextField.text)
+                        icon.visible(!defaultUrlIsValid)
+                    }
+
+                    buildUrlTextField = textFieldCell.component
+                }
+                row {
+                    val checkboxCell = checkBox("Connect to custom VisualBoost instance").onChanged {
+                        handleUrlTextFieldState()
+                    }
+
+                    adaptUrlCheckbox = checkboxCell.component
+                    adaptUrlCheckbox.isSelected = settings.useCustomUrlIsSelected()
+                }
+            }
+        }
+
         handleUrlTextFieldState()
-
-        //Create advances input form
-        val form = FormBuilder.createFormBuilder()
-            .addLabeledComponent(
-                "Domain (URL):",
-                defaultUrlTextField,
-                1,
-                false
-            )
-            .addLabeledComponent(
-                "Authentication-Service (URL):",
-                authUrlTextField,
-                1,
-                false
-            )
-            .addLabeledComponent(
-                "Main-Service (URL):",
-                mainUrlTextField,
-                1,
-                false
-            )
-            .addComponent(adaptUrlCheckbox)
-            .panel
-        form.isVisible = false
-
-        panel.add(collapsibleTitledSeparator)
-        panel.add(form)
-
-        adaptUrlCheckbox.addActionListener {
-            handleUrlTextFieldState()
-        }
-
-        collapsibleTitledSeparator.onAction {
-            form.isVisible = it
-        }
-
         return panel
     }
 
@@ -291,6 +335,7 @@ class VbPluginSettingsComponent(val project: Project) : CoroutineScope {
 
         defaultUrlTextField.isEnabled = isSelected
         mainUrlTextField.isEnabled = isSelected
+        buildUrlTextField.isEnabled = isSelected
         authUrlTextField.isEnabled = isSelected
     }
 
@@ -306,6 +351,9 @@ class VbPluginSettingsComponent(val project: Project) : CoroutineScope {
         return mainUrlTextField.text
     }
 
+    fun getBuildUrl(): String {
+        return buildUrlTextField.text
+    }
 
     fun getAuthUrl(): String {
         return authUrlTextField.text
@@ -333,5 +381,9 @@ class VbPluginSettingsComponent(val project: Project) : CoroutineScope {
             loginPanel.isVisible = !userIsLoggedIn
             logoutPanel.isVisible = userIsLoggedIn
         }
+    }
+
+    fun customUrlsAreValid(): Boolean {
+        return getDefaultUrl().isNotBlank() && getMainUrl().isNotBlank() && getBuildUrl().isNotBlank() && getAuthUrl().isNotBlank()
     }
 }

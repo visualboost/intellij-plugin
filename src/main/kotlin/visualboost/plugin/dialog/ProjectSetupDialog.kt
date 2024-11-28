@@ -1,13 +1,11 @@
 package visualboost.plugin.dialog
 
 import com.intellij.execution.RunManager
-import com.intellij.execution.actions.EditRunConfigurationsAction
+import com.intellij.execution.impl.RunDialog
 import com.intellij.ide.BrowserUtil
-import com.intellij.openapi.actionSystem.ActionManager
 import com.intellij.openapi.project.Project
 import com.intellij.openapi.ui.DialogWrapper
 import com.intellij.ui.dsl.builder.BottomGap
-import com.intellij.ui.dsl.builder.Panel
 import com.intellij.ui.dsl.builder.panel
 import visualboost.plugin.api.API
 import visualboost.plugin.util.*
@@ -26,29 +24,6 @@ class ProjectSetupDialog(
 
     init {
         title = "Project created"
-
-//        setDoNotAskOption(object : com.intellij.openapi.ui.DoNotAskOption {
-//            override fun isToBeShown(): Boolean {
-//                return true
-//            }
-//
-//            override fun setToBeShown(p0: Boolean, p1: Int) {
-//                println(p0)
-//            }
-//
-//            override fun canBeHidden(): Boolean {
-//                return true
-//            }
-//
-//            override fun shouldSaveOptionsOnCancel(): Boolean {
-//                return true
-//            }
-//
-//            override fun getDoNotShowMessage(): String {
-//                return "Do not show again"
-//            }
-//
-//        })
 
         init()
         val cancelButton = getButton(cancelAction)
@@ -112,25 +87,24 @@ class ProjectSetupDialog(
                     this.addHyperlinkListener {
                         if (it.eventType != HyperlinkEvent.EventType.ACTIVATED) return@addHyperlinkListener
 
-                        val configurationSettings = if (it.description == "showDbConfig") {
-                            RunManager.getInstance(project)
-                                .findConfigurationByName(project.getStartDatabaseConfigurationName())
+                        val configName = if (it.description == "showDbConfig") {
+                            project.getStartDatabaseConfigurationName()
                         } else if (it.description == "startAppConfig") {
-                            RunManager.getInstance(project)
-                                .findConfigurationByName(project.getStartApplicationOnceRunConfigName())
+                            project.getStartApplicationOnceRunConfigName()
                         } else if (it.description == "startDeamonConfig") {
-                            RunManager.getInstance(project)
-                                .findConfigurationByName(project.getStartApplicationInDevModeRunConfigName())
+                            project.getStartApplicationInDevModeRunConfigName()
                         } else {
                             null
                         }
 
-                        if (configurationSettings != null) {
-                            RunManager.getInstance(project).selectedConfiguration = configurationSettings
-                        }
+                        val configurationSettings = RunManager.getInstance(project)
+                            .findConfigurationByName(configName)
 
-                        ActionManager.getInstance()
-                            .tryToExecute(EditRunConfigurationsAction(), null, null, null, false)
+                        if (configurationSettings == null) {
+                            project.showError("Missing run configuration", "Can't find the run configuration $configName. Please make sure the run configuration exists.")
+                            return@addHyperlinkListener
+                        }
+                        RunDialog.editConfiguration(project, configurationSettings, configurationSettings.name)
                     }
                 }
                 bottomGap(BottomGap.SMALL)

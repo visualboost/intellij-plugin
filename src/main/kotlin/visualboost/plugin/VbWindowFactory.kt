@@ -12,7 +12,7 @@ class VbWindowFactory: ToolWindowFactory {
         val component = toolWindow.component
 
         vbWindow.initBrowser(toolWindow.disposable)
-        component.parent.add(vbWindow.content)
+        component.add(vbWindow.content)
     }
 
 }

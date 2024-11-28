@@ -16,3 +16,4 @@ out/
 ### Properties ###
 *.properties
 .intellijPlatform/
+.run/Run Plugin.run.xml

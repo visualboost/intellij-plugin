@@ -15,11 +15,12 @@ import com.intellij.notification.NotificationType
 import com.intellij.openapi.actionSystem.ActionManager
 import com.intellij.openapi.actionSystem.AnAction
 import com.intellij.openapi.project.Project
+import com.intellij.openapi.vfs.VirtualFile
 import com.intellij.remoteServer.configuration.RemoteServersManager
 import visualboost.plugin.icons.IconRes
-import java.nio.file.Paths
+import java.io.File
 import javax.swing.Icon
-import kotlin.io.path.absolutePathString
+import kotlin.io.path.invariantSeparatorsPathString
 
 
 fun Project.showNotification(
@@ -29,13 +30,14 @@ fun Project.showNotification(
     icon: Icon? = null,
     actions: List<AnAction> = emptyList()
 ) {
-    val notification = NotificationGroupManager.getInstance()
+    val notificationGroup = NotificationGroupManager.getInstance()
         .getNotificationGroup("visualboost.notification")
-        .createNotification(title, msg, type)
+    if(notificationGroup == null) return
+
+    val notification = notificationGroup.createNotification(title, msg, type)
         .setIcon(icon)
 
     actions.forEach { notification.addAction(it) }
-
     notification.notify(this)
 }
 
@@ -43,43 +45,38 @@ fun Project.showError(title: String, msg: String, actions: List<AnAction> = empt
     showNotification(title, msg, NotificationType.ERROR, actions = actions)
 }
 
-fun Project.showInfo(title: String, msg: String) {
-    showNotification(title, msg, NotificationType.INFORMATION, IconRes.CheckIcon)
+fun Project.showInfo(title: String, msg: String, actions: List<AnAction> = emptyList()) {
+    showNotification(title, msg, NotificationType.INFORMATION, IconRes.CheckIcon, actions)
 }
 
-fun Project.createDockerConfiguration() {
+fun Project.showWarning(title: String, msg: String, actions: List<AnAction> = emptyList()) {
+    showNotification(title, msg, NotificationType.WARNING, actions = actions)
+}
+
+/**
+ * Create a docker run configuration
+ *
+ * @param name: Name of the run configuration
+ * @param composeFile: The docker-compose.yml file
+ * @param dotEnvFile: The .env file
+ */
+fun Project.createDockerConfiguration(name: String, composeFile: File, dotEnvFile: File): RunnerAndConfigurationSettings? {
     try {
-        val dockerComposeFile = ProjectDirectories.getDockerComposeFile(this)
-        if (dockerComposeFile == null) {
-            showError(
-                "Missing File",
-                "<html>Can't create <b>Docker Configuration</b>.<br/>Missing file: <b>docker-compose.yml</b> in project directory.</html>"
-            )
-            return
-        }
-
-        val dbEnvFile = ProjectDirectories.getDbEnvFile(this)
-        if (dbEnvFile == null) {
-            showError(
-                "Missing Environment Variables",
-                "<html>Can't create <b>Docker Configuration</b>.<br/>Missing file: <b>.env</b> in project directory.</html>"
-            )
-            return
-        }
-
         val deploymentSource = DockerComposeDeploymentSourceType.getInstance().singletonSource
         val dockerDeploymentConfiguration = DockerDeploymentConfiguration()
-        dockerDeploymentConfiguration.envFilePath = dbEnvFile.absolutePath
-        dockerDeploymentConfiguration.sourceFilePath = dockerComposeFile.absolutePath
+        dockerDeploymentConfiguration.envFilePath = dotEnvFile.absolutePath
+        dockerDeploymentConfiguration.sourceFilePath = composeFile.absolutePath
 
         val server = RemoteServersManager.getInstance().servers.firstOrNull { it.name == "Docker" }
         if (server == null) {
-            showError(
+            showInfo(
                 "Missing Plugin",
                 "<html>Can't create a new <b>Docker Configuration</b>.<br/>Install the Docker Plugin first.</html>",
-                listOf(ActionManager.getInstance().getAction("visualboost.plugin.actions.OpenDockerPluginWebsiteAction"))
+                listOf(
+                    ActionManager.getInstance().getAction("visualboost.plugin.actions.OpenDockerPluginWebsiteAction")
+                )
             )
-            return
+            return null
         }
 
         val configuration: RunnerAndConfigurationSettings = DockerRunConfigurationCreator(this).createConfiguration(
@@ -87,14 +84,26 @@ fun Project.createDockerConfiguration() {
             dockerDeploymentConfiguration,
             server
         )
-        configuration.name = this.getStartDatabaseConfigurationName()
+        configuration.name = name
 
         val runManager = RunManager.getInstance(this)
         runManager.addConfiguration(configuration)
-        runManager.selectedConfiguration = configuration
+        return configuration
     } catch (e: Exception) {
         showError("Error", "Unexpected error during database run configuration creation.")
+        return null
     }
+}
+
+fun Project.selectRunConfig(name: String){
+    val runConfigToSelect = this.getDockerRunConfiguration(name) ?: return
+    val runManager = RunManager.getInstance(this)
+    runManager.selectedConfiguration = runConfigToSelect
+}
+
+fun Project.getDockerRunConfiguration(name: String): RunnerAndConfigurationSettings? {
+    val runManager = RunManager.getInstance(this)
+    return runManager.findConfigurationByName(name)
 }
 
 fun Project.getStartDatabaseConfigurationName(): String {
@@ -109,10 +118,14 @@ fun Project.getStartApplicationInDevModeRunConfigName(): String {
     return "Start Application (Deamon)"
 }
 
+fun Project.getStartAuthServiceConfigName(): String {
+    return "Run Authentication Service"
+}
+
 fun Project.createNpmRunConfig(name: String, command: String) {
     try {
         val packageJsonPath = ProjectDirectories.getPackageJsonFile(this)
-        if(packageJsonPath == null){
+        if (packageJsonPath == null) {
             showError(
                 "Missing package.json",
                 "<html>Can't create a new <b>Run Configuration</b>.<br/>Missing file: <b>package.json</b> in project directory.</html>",
@@ -122,7 +135,8 @@ fun Project.createNpmRunConfig(name: String, command: String) {
 
         val runManager = RunManager.getInstance(this)
         val configurationType = ConfigurationTypeUtil.findConfigurationType(NpmConfigurationType::class.java)
-        val configuration: RunnerAndConfigurationSettings = runManager.createConfiguration("Run", configurationType.configurationFactories[0])
+        val configuration: RunnerAndConfigurationSettings =
+            runManager.createConfiguration("Run", configurationType.configurationFactories[0])
 
         val runConfiguration = configuration.configuration as NpmRunConfiguration
         runConfiguration.name = name
@@ -137,4 +151,24 @@ fun Project.createNpmRunConfig(name: String, command: String) {
     } catch (e: Exception) {
         showError("Error", "Unexpected error during npm run configuration creation.")
     }
+}
+
+fun Project.isVbignoreFile(vFile: VirtualFile): Boolean {
+    val projectDir = ProjectDirectories.getProjectDir(this) ?: return false
+    val vbIgnoreFile = File(projectDir.absolutePath, ".vbignore")
+
+    val vbIgnoreFilePath = vbIgnoreFile.invariantSeparatorsPath
+    val vFilePath = vFile.toNioPath().invariantSeparatorsPathString
+
+    return vbIgnoreFilePath == vFilePath
+}
+
+fun Project.getOrCreateVbIgnoreFile(): File {
+    val projectDir = ProjectDirectories.getProjectDir(this)
+        val vbIgnoreFile = File(projectDir.absolutePath, ".vbignore")
+        if (!vbIgnoreFile.exists()) {
+            vbIgnoreFile.createNewFile()
+        }
+
+        return vbIgnoreFile
 }
